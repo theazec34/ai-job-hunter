@@ -102,9 +102,11 @@ export default function Home() {
             <form className="space-y-5" onSubmit={submitAuth}>
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" required value={email}
+                className="border-slate-700 bg-slate-950 text-slate-100"
                 onChange={(event) => setEmail(event.target.value)} />
               <Label htmlFor="password">Contraseña</Label>
               <Input id="password" type="password" required minLength={register ? 10 : undefined}
+                className="border-slate-700 bg-slate-950 text-slate-100"
                 value={password} onChange={(event) => setPassword(event.target.value)} />
               {message && <p className="text-sm text-amber-300">{message}</p>}
               <Button disabled={loading} className="w-full bg-cyan-400 text-slate-950">

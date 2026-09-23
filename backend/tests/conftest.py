@@ -2,6 +2,7 @@ import os
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///./test.db"
 os.environ["JWT_SECRET"] = "test-secret-that-is-at-least-thirty-two-characters"
+os.environ["CORS_ORIGINS"] = "http://localhost:43123,http://127.0.0.1:43123"
 
 import pytest
 from fastapi.testclient import TestClient

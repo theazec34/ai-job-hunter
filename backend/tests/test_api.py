@@ -7,6 +7,18 @@ def test_health(client: TestClient):
     assert response.json() == {"status": "ok"}
 
 
+def test_preview_origin_is_allowed_by_cors(client: TestClient):
+    response = client.options(
+        "/api/auth/login",
+        headers={
+            "Origin": "http://127.0.0.1:43123",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:43123"
+
+
 def test_register_login_and_duplicate_email(client: TestClient):
     credentials = {"email": "Alfredo@Example.com", "password": "secure-password"}
     registered = client.post("/api/auth/register", json=credentials)
