@@ -112,10 +112,13 @@ export default function Home() {
               <Button disabled={loading} className="w-full bg-cyan-400 text-slate-950">
                 {loading ? "Procesando…" : register ? "Crear cuenta" : "Entrar"}
               </Button>
-              <Button type="button" variant="ghost" className="w-full"
-                onClick={() => setRegister((current) => !current)}>
+              <button
+                type="button"
+                className="w-full rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
+                onClick={() => setRegister((current) => !current)}
+              >
                 {register ? "Ya tengo cuenta" : "Crear una cuenta"}
-              </Button>
+              </button>
             </form>
           </CardContent>
         </Card>
