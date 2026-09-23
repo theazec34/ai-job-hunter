@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -13,6 +14,8 @@ from app.models import User
 
 password_hasher = PasswordHash.recommended()
 bearer = HTTPBearer(auto_error=False)
+DatabaseSession = Annotated[Session, Depends(get_db)]
+BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]
 
 
 def hash_password(password: str) -> str:
@@ -25,7 +28,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def create_access_token(user_id: int) -> str:
     settings = get_settings()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
         "iat": now,
@@ -35,8 +38,8 @@ def create_access_token(user_id: int) -> str:
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-    db: Session = Depends(get_db),
+    credentials: BearerCredentials,
+    db: DatabaseSession,
 ) -> User:
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

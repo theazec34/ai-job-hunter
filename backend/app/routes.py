@@ -1,4 +1,5 @@
 import re
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -20,10 +21,14 @@ from app.schemas import (
 from app.security import create_access_token, get_current_user, hash_password, verify_password
 
 router = APIRouter(prefix="/api")
+DatabaseSession = Annotated[Session, Depends(get_db)]
+AuthenticatedUser = Annotated[User, Depends(get_current_user)]
+CountryFilter = Annotated[str | None, Query(max_length=100)]
+ResultLimit = Annotated[int, Query(ge=1, le=100)]
 
 
 @router.post("/auth/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def register(payload: RegisterRequest, db: DatabaseSession) -> TokenResponse:
     email = payload.email.lower()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="An account with this email already exists")
@@ -34,13 +39,15 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="An account with this email already exists") from None
+        raise HTTPException(
+            status_code=409, detail="An account with this email already exists"
+        ) from None
     db.refresh(user)
     return TokenResponse(access_token=create_access_token(user.id))
 
 
 @router.post("/auth/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def login(payload: LoginRequest, db: DatabaseSession) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == payload.email.lower()))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -48,7 +55,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
 
 @router.get("/profile", response_model=ProfileResponse)
-def get_profile(current_user: User = Depends(get_current_user)) -> Profile:
+def get_profile(current_user: AuthenticatedUser) -> Profile:
     if current_user.profile is None:
         raise HTTPException(status_code=404, detail="Profile not created")
     return current_user.profile
@@ -57,8 +64,8 @@ def get_profile(current_user: User = Depends(get_current_user)) -> Profile:
 @router.put("/profile", response_model=ProfileResponse)
 def upsert_profile(
     payload: ProfileInput,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser,
+    db: DatabaseSession,
 ) -> Profile:
     profile = current_user.profile
     if profile is None:
@@ -75,8 +82,8 @@ def upsert_profile(
 @router.post("/jobs", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
 def create_job(
     payload: JobInput,
-    _: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    _: AuthenticatedUser,
+    db: DatabaseSession,
 ) -> Job:
     job = Job(**payload.model_dump(mode="json"))
     db.add(job)
@@ -91,10 +98,10 @@ def create_job(
 
 @router.get("/jobs", response_model=list[JobResponse])
 def list_jobs(
-    country: str | None = Query(default=None, max_length=100),
-    limit: int = Query(default=50, ge=1, le=100),
-    _: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    _: AuthenticatedUser,
+    db: DatabaseSession,
+    country: CountryFilter = None,
+    limit: ResultLimit = 50,
 ) -> list[Job]:
     statement = select(Job).order_by(Job.created_at.desc()).limit(limit)
     if country:
@@ -129,8 +136,8 @@ def score_job(profile: Profile, job: Job) -> tuple[int, list[str]]:
 
 @router.get("/matches", response_model=list[MatchResponse])
 def list_matches(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser,
+    db: DatabaseSession,
 ) -> list[MatchResponse]:
     if current_user.profile is None:
         raise HTTPException(status_code=400, detail="Create your profile before matching jobs")
