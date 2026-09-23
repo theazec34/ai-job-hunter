@@ -29,7 +29,12 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => setToken(sessionStorage.getItem("job-hunter-token")), []);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      setToken(sessionStorage.getItem("job-hunter-token"));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   async function load(accessToken: string) {
     try {
