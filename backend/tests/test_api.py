@@ -81,8 +81,9 @@ def test_jobs_matching_and_duplicate_protection(
 
     matches = client.get("/api/matches", headers=auth_headers)
     assert matches.status_code == 200
-    assert matches.json()[0]["score"] == 100
+    assert matches.json()[0]["score"] == 70
     assert "Skill: python" in matches.json()[0]["reasons"]
+    assert "Skill: fastapi" in matches.json()[0]["reasons"]
 
 
 def test_matching_requires_profile(client: TestClient, auth_headers: dict[str, str]):

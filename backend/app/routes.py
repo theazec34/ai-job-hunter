@@ -103,7 +103,8 @@ def list_jobs(
 
 
 def tokenize(value: str) -> set[str]:
-    return {word for word in re.findall(r"[a-z0-9+#.]+", value.lower()) if len(word) > 1}
+    pattern = r"[a-z0-9+#]+(?:\.[a-z0-9+#]+)*"
+    return {word for word in re.findall(pattern, value.lower()) if len(word) > 1}
 
 
 def score_job(profile: Profile, job: Job) -> tuple[int, list[str]]:
