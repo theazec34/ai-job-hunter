@@ -192,7 +192,9 @@ export default function Home() {
                   <p className="text-slate-600">{job.company} · {job.location}</p>
                   <p className="mt-3 text-sm text-slate-500">{reasons.join(" · ")}</p>
                 </div>
-                <Button asChild><a href={job.url} target="_blank" rel="noreferrer">Ver oferta</a></Button>
+                <Button render={<a href={job.url} target="_blank" rel="noreferrer" />}>
+                  Ver oferta
+                </Button>
               </CardContent>
             </Card>
           ))}
