@@ -71,9 +71,9 @@ export default function Home() {
     try {
       setProfile(await saveProfile(token, profile));
       setMatches(await getMatches(token));
-      setMessage("Perfil guardado y ofertas recalculadas.");
+      setMessage("Profile saved and matches recalculated.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No se pudo guardar el perfil");
+      setMessage(error instanceof Error ? error.message : "Could not save your profile");
     } finally {
       setLoading(false);
     }
@@ -85,17 +85,17 @@ export default function Home() {
         <section className="mx-auto max-w-xl py-12">
           <Badge className="mb-6 bg-cyan-400 text-slate-950">EUROPEAN CAREER COPILOT</Badge>
           <h1 className="text-5xl font-black leading-tight tracking-tight md:text-7xl">
-            Encuentra el puesto que encaja contigo.
+            Find the role that fits you.
           </h1>
           <p className="mt-6 max-w-lg text-lg text-slate-300">
-            Centraliza ofertas europeas y entiende por qué cada oportunidad merece tu atención.
+            Bring European jobs together and understand why each opportunity deserves your time.
           </p>
         </section>
         <Card className="mx-auto w-full max-w-md border-slate-700 bg-slate-900 text-slate-100">
           <CardHeader>
-            <CardTitle>{register ? "Crea tu cuenta" : "Accede a tu espacio"}</CardTitle>
+            <CardTitle>{register ? "Create your account" : "Sign in to your workspace"}</CardTitle>
             <CardDescription className="text-slate-400">
-              Tu perfil y recomendaciones permanecen separados.
+              Your profile and recommendations stay private to your account.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -104,20 +104,20 @@ export default function Home() {
               <Input id="email" type="email" required value={email}
                 className="border-slate-700 bg-slate-950 text-slate-100"
                 onChange={(event) => setEmail(event.target.value)} />
-              <Label htmlFor="password">Contraseña</Label>
+              <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" required minLength={register ? 10 : undefined}
                 className="border-slate-700 bg-slate-950 text-slate-100"
                 value={password} onChange={(event) => setPassword(event.target.value)} />
               {message && <p className="text-sm text-amber-300">{message}</p>}
               <Button disabled={loading} className="w-full bg-cyan-400 text-slate-950">
-                {loading ? "Procesando…" : register ? "Crear cuenta" : "Entrar"}
+                {loading ? "Working…" : register ? "Create account" : "Sign in"}
               </Button>
               <button
                 type="button"
                 className="w-full rounded-lg px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
                 onClick={() => setRegister((current) => !current)}
               >
-                {register ? "Ya tengo cuenta" : "Crear una cuenta"}
+                {register ? "I already have an account" : "Create an account"}
               </button>
             </form>
           </CardContent>
@@ -132,32 +132,32 @@ export default function Home() {
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div>
             <p className="text-xs font-bold tracking-[.25em] text-cyan-400">AI JOB HUNTER</p>
-            <h1 className="text-xl font-semibold">Panel de oportunidades</h1>
+            <h1 className="text-xl font-semibold">Opportunity dashboard</h1>
           </div>
           <Button variant="outline" onClick={() => {
             sessionStorage.removeItem("job-hunter-token");
             setToken(null);
-          }}>Cerrar sesión</Button>
+          }}>Sign out</Button>
         </div>
       </header>
       <div className="mx-auto grid max-w-6xl gap-6 px-5 py-8 lg:grid-cols-[380px_1fr]">
         <Card className="h-fit">
           <CardHeader>
-            <CardTitle>Tu perfil profesional</CardTitle>
-            <CardDescription>Separa skills, roles y países con comas.</CardDescription>
+            <CardTitle>Your professional profile</CardTitle>
+            <CardDescription>Separate skills, roles and countries with commas.</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={submitProfile}>
-              <Label htmlFor="name">Nombre</Label>
+              <Label htmlFor="name">Name</Label>
               <Input id="name" required value={profile.name}
                 onChange={(event) => setProfile({ ...profile, name: event.target.value })} />
-              <Label htmlFor="headline">Titular</Label>
+              <Label htmlFor="headline">Headline</Label>
               <Input id="headline" value={profile.headline}
                 onChange={(event) => setProfile({ ...profile, headline: event.target.value })} />
               {([
                 ["Skills", "skills"],
-                ["Roles deseados", "desired_roles"],
-                ["Países preferidos", "preferred_countries"],
+                ["Target roles", "desired_roles"],
+                ["Preferred countries", "preferred_countries"],
               ] as const).map(([label, key]) => (
                 <div className="space-y-2" key={key}>
                   <Label htmlFor={key}>{label}</Label>
@@ -165,23 +165,23 @@ export default function Home() {
                     onChange={(event) => setProfile({ ...profile, [key]: split(event.target.value) })} />
                 </div>
               ))}
-              <Button disabled={loading} className="w-full">Guardar y recalcular</Button>
+              <Button disabled={loading} className="w-full">Save and recalculate</Button>
               {message && <p className="text-sm text-slate-600">{message}</p>}
             </form>
           </CardContent>
         </Card>
         <section>
-          <p className="text-sm font-semibold text-cyan-700">MATCHING PERSONALIZADO</p>
+          <p className="text-sm font-semibold text-cyan-700">PERSONALISED MATCHING</p>
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-3xl font-bold">Mejores oportunidades</h2>
-            <Badge variant="secondary">{matches.length} ofertas</Badge>
+            <h2 className="text-3xl font-bold">Best opportunities</h2>
+            <Badge variant="secondary">{matches.length} jobs</Badge>
           </div>
           {matches.length === 0 ? (
             <Card className="border-dashed py-12 text-center">
               <CardContent>
-                <p className="font-semibold">Todavía no hay ofertas para comparar.</p>
+                <p className="font-semibold">There are no jobs to compare yet.</p>
                 <p className="mt-2 text-sm text-slate-500">
-                  Completa tu perfil. Los conectores autorizados llegarán en la siguiente fase.
+                  Complete your profile. Authorised data-source connectors are coming next.
                 </p>
               </CardContent>
             </Card>
@@ -198,7 +198,7 @@ export default function Home() {
                   <p className="mt-3 text-sm text-slate-500">{reasons.join(" · ")}</p>
                 </div>
                 <Button render={<a href={job.url} target="_blank" rel="noreferrer" />}>
-                  Ver oferta
+                  View job
                 </Button>
               </CardContent>
             </Card>

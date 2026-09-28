@@ -1,43 +1,41 @@
 # AI Job Hunter
 
-Aplicación full stack para centralizar oportunidades europeas y priorizarlas según el perfil
-profesional de cada usuario. La fase 1 incluye autenticación, perfiles aislados, catálogo de
-ofertas y un primer motor de puntuación explicable.
+A full-stack application for collecting European job opportunities and ranking them against each
+user's professional profile. Phase one includes account authentication, isolated user profiles, a
+normalised job catalogue and an explainable matching engine.
 
-## Arquitectura
+> This is an active learning project. The current matcher is deterministic, not an opaque AI
+> system: up to 60 points for skills, 25 for a target-role match and 15 for a preferred country.
 
-- **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS y componentes shadcn/ui.
-- **API:** FastAPI, Pydantic, SQLAlchemy y JWT firmado con HS256.
-- **Datos:** PostgreSQL 17.
-- **Calidad:** pytest para la API, Ruff para Python y ESLint/TypeScript para el frontend.
-- **Ejecución:** Docker Compose con servicios y comprobaciones de salud.
+## Architecture
 
-El motor asigna hasta 60 puntos por skills, 25 por coincidencia con el rol deseado y 15 por
-país preferido. Es determinista y explica cada coincidencia; no se presenta como una decisión de
-IA opaca.
+- **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS and shadcn/ui.
+- **API:** FastAPI, Pydantic, SQLAlchemy and HS256-signed JWTs.
+- **Data:** PostgreSQL 17.
+- **Quality:** pytest, Ruff, ESLint and TypeScript production builds.
+- **Runtime:** Docker Compose with service health checks.
 
-## Inicio rápido con Docker
+## Quick start with Docker
 
-Requisitos: Docker con Docker Compose.
+Requirements: Docker with Docker Compose.
 
 ```bash
 cp .env.example .env
-# Sustituye POSTGRES_PASSWORD y JWT_SECRET por valores aleatorios y seguros.
+# Replace POSTGRES_PASSWORD and JWT_SECRET with strong random values.
 docker compose up --build
 ```
 
-- Aplicación: <http://localhost:43123>
-- API y documentación OpenAPI: <http://localhost:8100/docs>
-- Salud de la API: <http://localhost:8100/health>
+- Application: <http://localhost:43123>
+- API and OpenAPI documentation: <http://localhost:8100/docs>
+- API health: <http://localhost:8100/health>
 
-PostgreSQL no se publica fuera de la red interna de Compose. Los datos persisten en el volumen
-`postgres_data`.
+PostgreSQL is not exposed outside the Compose network. Data persists in `postgres_data`.
 
-## Desarrollo local
+## Local development
 
 ### Backend
 
-Configura una instancia PostgreSQL y luego:
+Configure a PostgreSQL instance, then:
 
 ```bash
 cd backend
@@ -48,8 +46,8 @@ pip install -e ".[dev]"
 uvicorn app.main:app --reload --port 8100
 ```
 
-Actualiza `DATABASE_URL`, `JWT_SECRET` y `CORS_ORIGINS` en `backend/.env`. La clave JWT debe tener
-32 caracteres como mínimo.
+Update `DATABASE_URL`, `JWT_SECRET` and `CORS_ORIGINS` in `backend/.env`. The JWT secret must
+contain at least 32 characters.
 
 ### Frontend
 
@@ -60,9 +58,9 @@ npm ci
 npm run dev -- --port 43123
 ```
 
-Para este modo, establece `NEXT_PUBLIC_API_URL=http://localhost:8100`.
+For local development, set `NEXT_PUBLIC_API_URL=http://localhost:8100`.
 
-## Pruebas y linting
+## Tests and static checks
 
 ```bash
 cd backend
@@ -74,40 +72,46 @@ npm run lint
 npm run build
 ```
 
-Las pruebas usan una base SQLite temporal para ejecutarse sin servicios externos; producción y
-Docker usan PostgreSQL.
+Tests use a temporary SQLite database so that they can run without external services. Production
+and Docker use PostgreSQL.
 
-## API principal
+## Main API
 
-| Método | Ruta | Descripción |
+| Method | Route | Description |
 | --- | --- | --- |
-| `POST` | `/api/auth/register` | Crea una cuenta y devuelve un JWT |
-| `POST` | `/api/auth/login` | Valida credenciales y devuelve un JWT |
-| `GET/PUT` | `/api/profile` | Consulta o actualiza el perfil autenticado |
-| `GET/POST` | `/api/jobs` | Lista o incorpora ofertas normalizadas |
-| `GET` | `/api/matches` | Devuelve ofertas puntuadas para el perfil |
+| `POST` | `/api/auth/register` | Create an account and return a JWT |
+| `POST` | `/api/auth/login` | Validate credentials and return a JWT |
+| `GET/PUT` | `/api/profile` | Read or update the authenticated profile |
+| `GET/POST` | `/api/jobs` | List or add normalised jobs |
+| `GET` | `/api/matches` | Return scored jobs for the current profile |
 
-Todas las rutas excepto registro, acceso y salud requieren `Authorization: Bearer <token>`.
-Las ofertas se incorporan por API en esta fase. Los conectores EURES u otras fuentes autorizadas
-quedan para una fase posterior; no se realiza scraping de LinkedIn ni Indeed.
+Every route except registration, login and health requires `Authorization: Bearer <token>`. Jobs
+are added through the API during phase one. Future connectors will use authorised sources such as
+EURES; the application does not scrape LinkedIn or Indeed.
 
-## Variables de entorno
+## Environment variables
 
-Nunca subas `.env` al repositorio. Los archivos `.env.example` documentan:
+Never commit `.env`. The example files document:
 
-- `DATABASE_URL`: URL SQLAlchemy de PostgreSQL.
-- `JWT_SECRET`: secreto aleatorio de al menos 32 caracteres.
-- `ACCESS_TOKEN_EXPIRE_MINUTES`: duración del token, entre 5 y 1440 minutos.
-- `CORS_ORIGINS`: orígenes web permitidos, separados por comas.
-- `NEXT_PUBLIC_API_URL`: URL pública de la API accesible desde el navegador.
-- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`: credenciales de Compose.
+- `DATABASE_URL`: PostgreSQL SQLAlchemy URL.
+- `JWT_SECRET`: random secret with at least 32 characters.
+- `ACCESS_TOKEN_EXPIRE_MINUTES`: token lifetime between 5 and 1,440 minutes.
+- `CORS_ORIGINS`: comma-separated browser origins.
+- `NEXT_PUBLIC_API_URL`: public API URL used by the browser.
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`: Compose database credentials.
 
-## Límites conocidos de la fase 1
+## Known phase-one limitations
 
-- Las tablas se crean al arrancar; antes de evolucionar el esquema se añadirá Alembic.
-- No existen todavía conectores externos, refresh tokens, recuperación de contraseña ni roles de
-  administración.
-- El JWT se conserva en `sessionStorage`, por lo que la sesión termina al cerrar la pestaña. Una
-  futura versión puede utilizar una capa BFF con cookie `HttpOnly` y protección CSRF.
-- Crear ofertas requiere autenticación, pero todavía no un rol específico; está pensado para
-  carga controlada durante la demo.
+- Tables are created on startup; schema migrations are the next backend milestone.
+- External connectors, refresh tokens, password recovery and administrative roles are not
+  implemented yet.
+- The JWT is stored in `sessionStorage`, so the browser session ends with the tab. A future BFF
+  can move it into an `HttpOnly` cookie with CSRF protection.
+- Job creation requires authentication but not an administrative role; it is intended for a
+  controlled demonstration environment.
+
+## What I learned
+
+This project is helping me practise API boundaries, relational data modelling, authentication,
+input validation, automated testing and containerised local development. I use coding assistants
+as part of the workflow, then validate changes with tests, static analysis and manual checks.
