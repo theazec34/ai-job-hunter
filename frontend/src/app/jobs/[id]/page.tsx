@@ -51,12 +51,12 @@ export default function JobDetailPage() {
   async function track(nextStatus: "saved" | "applied") {
     const token = sessionStorage.getItem("job-hunter-token");
     if (!token || !job) return;
+    if (nextStatus === "applied") {
+      window.open(job.url, "_blank", "noopener,noreferrer");
+    }
     try {
       await saveApplication(token, job.id, nextStatus);
       setApplicationState(nextStatus);
-      if (nextStatus === "applied") {
-        window.open(job.url, "_blank", "noopener,noreferrer");
-      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not update this application.");
     }
