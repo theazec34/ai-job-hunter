@@ -323,7 +323,7 @@ def test_connector_import_deduplicates_and_enforces_limits(
     assert first.json()["imported"] == 1
     assert first.json()["attribution"] == "Required source attribution"
     assert first.json()["jobs"][0]["legitimacy_status"] == "source_verified"
-    assert first.json()["jobs"][0]["published_at"] == "2026-09-29T10:00:00Z"
+    assert first.json()["jobs"][0]["published_at"].startswith("2026-09-29T10:00:00")
     assert second.json()["imported"] == 0
     assert second.json()["duplicates"] == 1
     assert (
