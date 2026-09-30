@@ -57,7 +57,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setToken(sessionStorage.getItem("job-hunter-token"));
+    const frame = requestAnimationFrame(() => {
+      const storedToken = sessionStorage.getItem("job-hunter-token");
+      setToken(storedToken);
+      if (storedToken) void loadWorkspace(storedToken);
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   async function loadWorkspace(accessToken: string) {
