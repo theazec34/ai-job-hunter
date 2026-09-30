@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
+import { WorkspaceNavigation } from "@/components/job-hunter/workspace-navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,14 +18,16 @@ import {
   getResume,
   HousingAssistance,
   importJobs,
+  JobApplication,
   JobSource,
   ResumeProfile,
   saveApplication,
   uploadResume,
 } from "@/lib/api";
+import { CTA_COPY, WorkspaceSection } from "@/lib/ui-copy";
 
 const fieldClass =
-  "h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-cyan-600";
+  "min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-base outline-none focus:border-blue-700";
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong";
@@ -44,6 +47,7 @@ export default function Home() {
   const [register, setRegister] = useState(false);
   const [resume, setResume] = useState<ResumeProfile | null>(null);
   const [matches, setMatches] = useState<AIMatch[]>([]);
+  const [applications, setApplications] = useState<JobApplication[]>([]);
   const [applicationStatuses, setApplicationStatuses] = useState<Record<number, ApplicationStatus>>({});
   const [housing, setHousing] = useState<Record<number, HousingAssistance>>({});
   const [source, setSource] = useState<JobSource>("arbeitnow");
@@ -55,6 +59,7 @@ export default function Home() {
   const [limit, setLimit] = useState(30);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState<WorkspaceSection>("today");
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -70,8 +75,13 @@ export default function Home() {
       getResume(accessToken),
       getApplications(accessToken),
     ]);
-    if (resumeResult.status === "fulfilled") setResume(resumeResult.value);
+    if (resumeResult.status === "fulfilled") {
+      setResume(resumeResult.value);
+    } else {
+      setActiveSection("profile");
+    }
     if (applicationsResult.status === "fulfilled") {
+      setApplications(applicationsResult.value);
       setApplicationStatuses(
         Object.fromEntries(applicationsResult.value.map((item) => [item.job_id, item.status])),
       );
@@ -112,27 +122,17 @@ export default function Home() {
     }
   }
 
-  async function runImport() {
+  async function runSearch() {
     if (!token) return;
-    setLoading(true);
-    setMessage("");
-    try {
-      const result = await importJobs(token, { source, query, country: "NL", limit: 30 });
-      setMessage(
-        `${result.imported} jobs imported, ${result.duplicates} already known. ${result.attribution ?? ""}`,
-      );
-    } catch (error) {
-      setMessage(errorMessage(error));
-    } finally {
-      setLoading(false);
+    if (!resume) {
+      setMessage("Analyse your CV before searching for personalised matches.");
+      setActiveSection("profile");
+      return;
     }
-  }
-
-  async function runMatching() {
-    if (!token) return;
     setLoading(true);
     setMessage("");
     try {
+      const imported = await importJobs(token, { source, query, country: "NL", limit: 30 });
       const result = await getAIMatches(token, {
         country: "NL",
         city: city || undefined,
@@ -146,8 +146,8 @@ export default function Home() {
       setMatches(result);
       setMessage(
         result.length
-          ? `${result.length} jobs analysed. AI scores support—not replace—your review.`
-          : "No eligible jobs matched these filters.",
+          ? `${result.length} jobs analysed (${imported.imported} newly imported). AI scores support—not replace—your review.`
+          : `No eligible jobs matched these filters (${imported.imported} newly imported).`,
       );
     } catch (error) {
       setMessage(errorMessage(error));
@@ -159,8 +159,12 @@ export default function Home() {
   async function updateApplication(jobId: number, status: ApplicationStatus) {
     if (!token) return;
     try {
-      await saveApplication(token, jobId, status);
+      const updated = await saveApplication(token, jobId, status);
       setApplicationStatuses((current) => ({ ...current, [jobId]: status }));
+      setApplications((current) => [
+        updated,
+        ...current.filter((application) => application.job_id !== jobId),
+      ]);
       if (status !== "saved") setMatches((current) => current.filter((item) => item.job_id !== jobId));
     } catch (error) {
       setMessage(errorMessage(error));
@@ -179,6 +183,153 @@ export default function Home() {
     } catch (error) {
       setMessage(`${errorMessage(error)} Try a supported main city such as Amsterdam or Utrecht.`);
     }
+  }
+
+  function renderMatchCards() {
+    if (matches.length === 0) {
+      return (
+        <Card className="border-dashed py-12 text-center">
+          <CardContent>
+            <p className="font-semibold">No recommendations yet.</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Analyse your CV, then search for today&apos;s best matches.
+            </p>
+            <Button className="mt-5 min-h-11" onClick={() => setActiveSection("search")}>
+              Go to search
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return matches.map((match) => (
+      <Card className="mb-5" key={match.job_id}>
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-5 sm:flex-row">
+            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-slate-950 text-xl font-black text-cyan-400">
+              {match.overall_score}%
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">{match.job.source} · {match.job.country}</Badge>
+                <Badge>{match.recommendation}</Badge>
+                <Badge variant="secondary">
+                  {match.legitimacy_status === "source_verified"
+                    ? "Source checked"
+                    : "Review legitimacy"}
+                </Badge>
+              </div>
+              <h3 className="mt-3 text-xl font-bold">{match.job.title}</h3>
+              <p className="text-slate-600">{match.job.company} · {match.job.location}</p>
+              <p className="mt-1 text-sm font-medium">
+                {salary(match)} · {match.job.workplace_mode ?? "Mode unknown"}
+              </p>
+              <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
+                <div className="rounded-lg bg-emerald-50 p-3 text-emerald-950">
+                  <strong>Strengths</strong>
+                  <ul className="mt-1 list-disc pl-4">
+                    {match.strengths.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+                <div className="rounded-lg bg-amber-50 p-3 text-amber-950">
+                  <strong>Gaps to check</strong>
+                  <ul className="mt-1 list-disc pl-4">
+                    {match.gaps.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+              </div>
+              {match.evidence.length > 0 && (
+                <details className="mt-3 text-sm">
+                  <summary className="cursor-pointer font-semibold">Verbatim evidence</summary>
+                  {match.evidence.map((item, index) => (
+                    <p className="mt-2 border-l-2 border-cyan-700 pl-3" key={`${item.cv}-${index}`}>
+                      CV: “{item.cv}”<br />Job: “{item.job}”
+                    </p>
+                  ))}
+                </details>
+              )}
+              {match.legitimacy_reasons.length > 0 && (
+                <p className="mt-3 text-xs text-slate-600">
+                  Risk-screen notes: {match.legitimacy_reasons.join(", ")}. Verify the vacancy on
+                  the employer&apos;s website.
+                </p>
+              )}
+              {match.job.source_attribution && (
+                <p className="mt-2 text-xs text-slate-600">{match.job.source_attribution}</p>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-col gap-2">
+              <Button className="min-h-11" render={
+                <a href={match.job.url} target="_blank" rel="noreferrer" />
+              }>
+                View original job
+              </Button>
+              <select
+                className={`${fieldClass} min-h-11`}
+                aria-label={`Application status for ${match.job.title}`}
+                value={applicationStatuses[match.job_id] ?? ""}
+                onChange={(event) => {
+                  void updateApplication(match.job_id, event.target.value as ApplicationStatus);
+                }}
+              >
+                <option value="" disabled>Track status</option>
+                <option value="saved">{CTA_COPY.save}</option>
+                <option value="applied">Applied</option>
+                <option value="interview">Interview</option>
+                <option value="rejected">Rejected</option>
+                <option value="offer">Offer</option>
+                <option value="withdrawn">Withdrawn</option>
+              </select>
+              <Button
+                className="min-h-11"
+                variant="outline"
+                onClick={() => { void showHousing(match); }}
+              >
+                {CTA_COPY.housing}
+              </Button>
+            </div>
+          </div>
+
+          {housing[match.job_id] && (
+            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <h4 className="font-bold">Housing around {housing[match.job_id].job_city}</h4>
+              {housing[match.job_id].affordability && (
+                <p className="mt-1">
+                  Estimated range: €
+                  {housing[match.job_id].affordability!.minimum_monthly_rent.toLocaleString()}–€
+                  {housing[match.job_id].affordability!.maximum_monthly_rent.toLocaleString()}/month
+                </p>
+              )}
+              <div className="mt-3 flex flex-wrap gap-3">
+                {housing[match.job_id].nearby_cities.map((item) => (
+                  <div className="rounded-lg bg-white p-3" key={item.city}>
+                    <strong>{item.city}</strong>{" "}
+                    <span className="text-slate-600">({item.relation})</span>
+                    <div className="mt-2 flex flex-wrap gap-3">
+                      {item.provider_links.map((link) => (
+                        <a
+                          className="min-h-11 content-center text-blue-700 underline"
+                          href={link.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          key={link.provider}
+                        >
+                          {link.provider}
+                        </a>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-xs text-amber-800">Registration: verify manually</p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-slate-600">
+                {housing[match.job_id].data_notice} {housing[match.job_id].guarantee_notice}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    ));
   }
 
   if (!token) {
@@ -211,10 +362,10 @@ export default function Home() {
                 className="border-slate-700 bg-slate-950 text-slate-100"
                 value={password} onChange={(event) => setPassword(event.target.value)} />
               {message && <p className="text-sm text-amber-300">{message}</p>}
-              <Button type="submit" disabled={loading} className="w-full bg-cyan-400 text-slate-950">
+              <Button type="submit" disabled={loading} className="min-h-11 w-full bg-cyan-400 text-slate-950">
                 {loading ? "Working…" : register ? "Create account" : "Sign in"}
               </Button>
-              <button type="button" className="w-full rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-800"
+              <button type="button" className="min-h-11 w-full rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-800"
                 onClick={() => setRegister((current) => !current)}>
                 {register ? "I already have an account" : "Create an account"}
               </button>
@@ -226,215 +377,238 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-950">
-      <header className="border-b bg-slate-950 px-5 py-5 text-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
+    <main className="min-h-screen bg-slate-50 pb-20 text-slate-950 md:pb-0">
+      <header className="border-b border-slate-800 bg-slate-950 px-4 py-4 text-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-bold tracking-[.25em] text-cyan-400">AI JOB HUNTER</p>
-            <h1 className="text-xl font-semibold">Netherlands opportunity workspace</h1>
+            <p className="text-xs font-bold tracking-[.22em] text-cyan-400">AI JOB HUNTER</p>
+            <p className="text-sm text-slate-300">Private Netherlands job search</p>
           </div>
-          <Button variant="outline" onClick={() => {
-            sessionStorage.removeItem("job-hunter-token");
-            setToken(null);
-          }}>Sign out</Button>
+          <Button
+            className="min-h-11 border-slate-600 bg-transparent"
+            variant="outline"
+            onClick={() => {
+              sessionStorage.removeItem("job-hunter-token");
+              setToken(null);
+            }}
+          >
+            Sign out
+          </Button>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-5 py-8 lg:grid-cols-[360px_1fr]">
-        <aside className="space-y-5">
-          <Card>
-            <CardHeader>
-              <CardTitle>1. Analyse your CV</CardTitle>
-              <CardDescription>PDF only, maximum 5 MB. Extracted text is stored; the PDF is not.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-3" onSubmit={submitResume}>
-                <Input name="resume" type="file" accept="application/pdf,.pdf" required />
-                <Button type="submit" disabled={loading} className="w-full">Upload and analyse</Button>
-              </form>
-              {resume && (
-                <div className="mt-4 space-y-2 rounded-lg bg-slate-100 p-3 text-sm">
-                  <p className="font-semibold">{resume.summary ?? "Profile extracted"}</p>
-                  <p><strong>Roles:</strong> {resume.target_roles.join(", ") || "Not found"}</p>
-                  <p><strong>Skills:</strong> {resume.skills.join(", ") || "Not found"}</p>
-                  <p><strong>Languages:</strong> {resume.languages.join(", ") || "Not found"}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 md:px-6 md:py-8">
+        <WorkspaceNavigation active={activeSection} onChange={setActiveSection} />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>2. Import jobs</CardTitle>
-              <CardDescription>Uses permitted APIs. LinkedIn and Indeed are not scraped.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Label htmlFor="source">Source</Label>
-              <select id="source" className={fieldClass} value={source}
-                onChange={(event) => setSource(event.target.value as JobSource)}>
-                <option value="arbeitnow">Arbeitnow</option>
-                <option value="remotive">Remotive</option>
-                <option value="eures">EURES (optional)</option>
-                <option value="adzuna_nl">Adzuna NL (credentials required)</option>
-              </select>
-              <Label htmlFor="query">Keywords</Label>
-              <Input id="query" value={query} onChange={(event) => setQuery(event.target.value)} />
-              <Button disabled={loading} className="w-full" onClick={runImport}>Import up to 30</Button>
-              <p className="text-xs text-slate-500">
-                Automated risk checks reduce obvious fraud signals but cannot guarantee legitimacy.
+        <div className="min-w-0 flex-1">
+          {message && (
+            <p role="status" className="mb-5 rounded-xl border border-slate-200 bg-white p-4 text-sm">
+              {message}
+            </p>
+          )}
+
+          {activeSection === "today" && (
+            <section aria-labelledby="today-title">
+              <p className="text-sm font-semibold text-cyan-800">YOUR DAILY SHORTLIST</p>
+              <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h1 id="today-title" className="text-3xl font-bold tracking-tight">
+                    Today
+                  </h1>
+                  <p className="mt-1 text-slate-600">
+                    Your strongest current opportunities in one place.
+                  </p>
+                </div>
+                <Button className="min-h-11" onClick={() => setActiveSection("search")}>
+                  {CTA_COPY.findJobs}
+                </Button>
+              </div>
+              <div className="mb-6 grid gap-3 sm:grid-cols-3">
+                <Card><CardContent className="pt-5"><strong>{matches.length}</strong><p className="text-sm text-slate-600">Current matches</p></CardContent></Card>
+                <Card><CardContent className="pt-5"><strong>{applications.length}</strong><p className="text-sm text-slate-600">Tracked applications</p></CardContent></Card>
+                <Card><CardContent className="pt-5"><strong>{resume ? "Ready" : "Missing"}</strong><p className="text-sm text-slate-600">CV profile</p></CardContent></Card>
+              </div>
+              {renderMatchCards()}
+            </section>
+          )}
+
+          {activeSection === "search" && (
+            <section aria-labelledby="search-title">
+              <p className="text-sm font-semibold text-cyan-800">NETHERLANDS FIRST</p>
+              <h1 id="search-title" className="text-3xl font-bold tracking-tight">Search</h1>
+              <p className="mt-1 text-slate-600">
+                Search Dutch roles now. Worldwide remote roles will be added only after location
+                validation is reliable.
               </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>3. Match and filter</CardTitle>
-              <CardDescription>Salary means annual gross EUR. Unknown salaries are explicit.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Label htmlFor="city">Dutch city</Label>
-              <Input id="city" placeholder="Amsterdam" value={city}
-                onChange={(event) => setCity(event.target.value)} />
-              <Label htmlFor="salary">Minimum annual salary (€)</Label>
-              <Input id="salary" type="number" min="0" placeholder="45000" value={minimumSalary}
-                onChange={(event) => setMinimumSalary(event.target.value)} />
-              <Label htmlFor="workplace">Workplace</Label>
-              <select id="workplace" className={fieldClass} value={workplaceMode}
-                onChange={(event) => setWorkplaceMode(event.target.value)}>
-                <option value="">Any</option>
-                <option value="onsite">On-site</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="remote">Remote</option>
-              </select>
-              <Label htmlFor="limit">Maximum results</Label>
-              <select id="limit" className={fieldClass} value={limit}
-                onChange={(event) => setLimit(Number(event.target.value))}>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={30}>30</option>
-              </select>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={includeUnknownSalary}
-                  onChange={(event) => setIncludeUnknownSalary(event.target.checked)} />
-                Include jobs without published salary
-              </label>
-              <Button disabled={loading || !resume} className="w-full" onClick={runMatching}>
-                Analyse best matches
-              </Button>
-            </CardContent>
-          </Card>
-        </aside>
-
-        <section>
-          <p className="text-sm font-semibold text-cyan-700">EVIDENCE-BASED MATCHING</p>
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-3xl font-bold">Best opportunities</h2>
-            <Badge variant="secondary">{matches.length} jobs</Badge>
-          </div>
-          {message && <p className="mb-4 rounded-lg border bg-white p-3 text-sm">{message}</p>}
-          {matches.length === 0 ? (
-            <Card className="border-dashed py-12 text-center">
-              <CardContent>
-                <p className="font-semibold">No AI results yet.</p>
-                <p className="mt-2 text-sm text-slate-500">
-                  Upload your CV, import jobs, choose filters and start matching.
-                </p>
-              </CardContent>
-            </Card>
-          ) : matches.map((match) => (
-            <Card className="mb-5" key={match.job_id}>
-              <CardContent className="pt-6">
-                <div className="flex flex-col gap-5 sm:flex-row">
-                  <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-slate-950 text-xl font-black text-cyan-400">
-                    {match.overall_score}%
+              <Card className="my-6">
+                <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="query">Role or skills</Label>
+                    <Input id="query" className="mt-2 min-h-11" value={query}
+                      onChange={(event) => setQuery(event.target.value)} />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">{match.job.source} · {match.job.country}</Badge>
-                      <Badge>{match.recommendation}</Badge>
-                      <Badge variant="secondary">
-                        {match.legitimacy_status === "source_verified" ? "Source verified" : "Review legitimacy"}
-                      </Badge>
-                    </div>
-                    <h3 className="mt-3 text-xl font-bold">{match.job.title}</h3>
-                    <p className="text-slate-600">{match.job.company} · {match.job.location}</p>
-                    <p className="mt-1 text-sm font-medium">{salary(match)} · {match.job.workplace_mode ?? "Mode unknown"}</p>
-                    <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-                      <div className="rounded-lg bg-emerald-50 p-3">
-                        <strong>Strengths</strong>
-                        <ul className="mt-1 list-disc pl-4">{match.strengths.map((item) => <li key={item}>{item}</li>)}</ul>
-                      </div>
-                      <div className="rounded-lg bg-amber-50 p-3">
-                        <strong>Gaps to check</strong>
-                        <ul className="mt-1 list-disc pl-4">{match.gaps.map((item) => <li key={item}>{item}</li>)}</ul>
-                      </div>
-                    </div>
-                    {match.evidence.length > 0 && (
-                      <details className="mt-3 text-sm">
-                        <summary className="cursor-pointer font-semibold">Verbatim evidence</summary>
-                        {match.evidence.map((item, index) => (
-                          <p className="mt-2 border-l-2 border-cyan-600 pl-3" key={`${item.cv}-${index}`}>
-                            CV: “{item.cv}”<br />Job: “{item.job}”
-                          </p>
-                        ))}
-                      </details>
-                    )}
-                    {match.legitimacy_reasons.length > 0 && (
-                      <p className="mt-3 text-xs text-slate-500">
-                        Risk-screen notes: {match.legitimacy_reasons.join(", ")}. Verify on the employer website.
-                      </p>
-                    )}
-                    {match.job.source_attribution && <p className="mt-2 text-xs text-slate-500">{match.job.source_attribution}</p>}
+                  <div>
+                    <Label htmlFor="city">Dutch city (optional)</Label>
+                    <Input id="city" className="mt-2 min-h-11" placeholder="Amsterdam" value={city}
+                      onChange={(event) => setCity(event.target.value)} />
                   </div>
-                  <div className="flex shrink-0 flex-col gap-2">
-                    <Button render={<a href={match.job.url} target="_blank" rel="noreferrer" />}>View job</Button>
-                    <select className={fieldClass} aria-label={`Application status for ${match.job.title}`}
-                      value={applicationStatuses[match.job_id] ?? ""}
-                      onChange={(event) => updateApplication(match.job_id, event.target.value as ApplicationStatus)}>
-                      <option value="" disabled>Track status</option>
-                      <option value="saved">Saved</option>
-                      <option value="applied">Applied</option>
-                      <option value="interview">Interview</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="offer">Offer</option>
-                      <option value="withdrawn">Withdrawn</option>
+                  <div>
+                    <Label htmlFor="salary">Minimum annual gross salary (€)</Label>
+                    <Input id="salary" className="mt-2 min-h-11" type="number" min="0"
+                      placeholder="45000" value={minimumSalary}
+                      onChange={(event) => setMinimumSalary(event.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="workplace">Workplace</Label>
+                    <select id="workplace" className={`${fieldClass} mt-2 min-h-11`}
+                      value={workplaceMode} onChange={(event) => setWorkplaceMode(event.target.value)}>
+                      <option value="">Any</option>
+                      <option value="onsite">On-site</option>
+                      <option value="hybrid">Hybrid</option>
+                      <option value="remote">Remote</option>
                     </select>
-                    <Button variant="outline" onClick={() => showHousing(match)}>Housing options</Button>
                   </div>
-                </div>
-
-                {housing[match.job_id] && (
-                  <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
-                    <h4 className="font-bold">Housing around {housing[match.job_id].job_city}</h4>
-                    {housing[match.job_id].affordability && (
-                      <p className="mt-1">
-                        Estimated range: €{housing[match.job_id].affordability!.minimum_monthly_rent.toLocaleString()}–
-                        €{housing[match.job_id].affordability!.maximum_monthly_rent.toLocaleString()}/month
-                      </p>
-                    )}
-                    <div className="mt-3 flex flex-wrap gap-3">
-                      {housing[match.job_id].nearby_cities.map((item) => (
-                        <div className="rounded-lg bg-white p-3" key={item.city}>
-                          <strong>{item.city}</strong> <span className="text-slate-500">({item.relation})</span>
-                          <div className="mt-1 flex gap-2">
-                            {item.provider_links.map((link) => (
-                              <a className="text-cyan-700 underline" href={link.url} target="_blank"
-                                rel="noreferrer" key={link.provider}>{link.provider}</a>
-                            ))}
-                          </div>
-                          <p className="mt-1 text-xs text-amber-700">Registration: verify manually</p>
-                        </div>
-                      ))}
+                  <label className="flex min-h-11 items-center gap-3 self-end text-sm">
+                    <input type="checkbox" checked={includeUnknownSalary}
+                      onChange={(event) => setIncludeUnknownSalary(event.target.checked)} />
+                    Include jobs without published salary
+                  </label>
+                  <details className="sm:col-span-2">
+                    <summary className="cursor-pointer py-2 font-semibold">Advanced options</summary>
+                    <div className="mt-3 grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="source">Job source</Label>
+                        <select id="source" className={`${fieldClass} mt-2 min-h-11`} value={source}
+                          onChange={(event) => setSource(event.target.value as JobSource)}>
+                          <option value="arbeitnow">Arbeitnow</option>
+                          <option value="remotive">Remotive</option>
+                          <option value="eures">EURES (experimental)</option>
+                          <option value="adzuna_nl">Adzuna NL (credentials required)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor="limit">Maximum results</Label>
+                        <select id="limit" className={`${fieldClass} mt-2 min-h-11`} value={limit}
+                          onChange={(event) => setLimit(Number(event.target.value))}>
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={30}>30</option>
+                        </select>
+                      </div>
                     </div>
-                    <p className="mt-3 text-xs text-slate-500">
-                      {housing[match.job_id].data_notice} {housing[match.job_id].guarantee_notice}
-                    </p>
+                  </details>
+                  <div className="sm:col-span-2">
+                    <Button className="min-h-11 w-full sm:w-auto" disabled={loading || !resume}
+                      onClick={() => { void runSearch(); }}>
+                      {loading ? "Searching…" : CTA_COPY.findJobs}
+                    </Button>
+                    {!resume && <p className="mt-2 text-sm text-amber-800">Analyse your CV in Profile first.</p>}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </section>
+                </CardContent>
+              </Card>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Results</h2>
+                <Badge variant="secondary">{matches.length} jobs</Badge>
+              </div>
+              {renderMatchCards()}
+            </section>
+          )}
+
+          {activeSection === "applications" && (
+            <section aria-labelledby="applications-title">
+              <p className="text-sm font-semibold text-cyan-800">YOUR PIPELINE</p>
+              <h1 id="applications-title" className="text-3xl font-bold tracking-tight">
+                Applications
+              </h1>
+              <p className="mt-1 text-slate-600">Keep every next step visible.</p>
+              <div className="mt-6 space-y-4">
+                {applications.length === 0 ? (
+                  <Card className="border-dashed py-12 text-center">
+                    <CardContent>
+                      <p className="font-semibold">No tracked applications yet.</p>
+                      <Button className="mt-5 min-h-11" onClick={() => setActiveSection("search")}>
+                        Find jobs
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : applications.map((application) => (
+                  <Card key={application.id}>
+                    <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center">
+                      <div className="min-w-0 flex-1">
+                        <Badge>{application.status}</Badge>
+                        <h2 className="mt-2 text-lg font-bold">{application.job.title}</h2>
+                        <p className="text-sm text-slate-600">
+                          {application.job.company} · {application.job.location}
+                        </p>
+                      </div>
+                      <Button className="min-h-11" variant="outline" render={
+                        <a href={application.job.url} target="_blank" rel="noreferrer" />
+                      }>
+                        View original job
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {activeSection === "profile" && (
+            <section aria-labelledby="profile-title">
+              <p className="text-sm font-semibold text-cyan-800">3-STEP SETUP</p>
+              <h1 id="profile-title" className="text-3xl font-bold tracking-tight">Profile</h1>
+              <p className="mt-1 text-slate-600">Set up your private matching profile.</p>
+              <div className="mt-6 grid gap-5 lg:grid-cols-3">
+                <Card>
+                  <CardHeader>
+                    <Badge className="w-fit">1</Badge>
+                    <CardTitle>{CTA_COPY.analyseCv}</CardTitle>
+                    <CardDescription>PDF only, maximum 5 MB. The PDF is not stored.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form className="space-y-3" onSubmit={submitResume}>
+                      <Input className="min-h-11" name="resume" type="file"
+                        accept="application/pdf,.pdf" required />
+                      <Button type="submit" disabled={loading} className="min-h-11 w-full">
+                        {CTA_COPY.analyseCv}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <Badge className="w-fit" variant="secondary">2</Badge>
+                    <CardTitle>Review extracted profile</CardTitle>
+                    <CardDescription>Confirm what the matcher will use.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    {resume ? (
+                      <>
+                        <p className="font-semibold">{resume.summary ?? "Profile extracted"}</p>
+                        <p><strong>Roles:</strong> {resume.target_roles.join(", ") || "Not found"}</p>
+                        <p><strong>Skills:</strong> {resume.skills.join(", ") || "Not found"}</p>
+                        <p><strong>Languages:</strong> {resume.languages.join(", ") || "Not found"}</p>
+                      </>
+                    ) : <p className="text-slate-600">Complete step 1 first.</p>}
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <Badge className="w-fit" variant="secondary">3</Badge>
+                    <CardTitle>Choose job preferences</CardTitle>
+                    <CardDescription>City, salary and work mode live in Search.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button className="min-h-11 w-full" disabled={!resume}
+                      onClick={() => setActiveSection("search")}>
+                      Set preferences
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+          )}
+        </div>
       </div>
     </main>
   );
