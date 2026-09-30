@@ -408,8 +408,8 @@ export default function Home() {
                     <h4 className="font-bold">Housing around {housing[match.job_id].job_city}</h4>
                     {housing[match.job_id].affordability && (
                       <p className="mt-1">
-                        Estimated range: €{housing[match.job_id].affordability.minimum_monthly_rent.toLocaleString()}–
-                        €{housing[match.job_id].affordability.maximum_monthly_rent.toLocaleString()}/month
+                        Estimated range: €{housing[match.job_id].affordability!.minimum_monthly_rent.toLocaleString()}–
+                        €{housing[match.job_id].affordability!.maximum_monthly_rent.toLocaleString()}/month
                       </p>
                     )}
                     <div className="mt-3 flex flex-wrap gap-3">
