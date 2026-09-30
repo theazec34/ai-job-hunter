@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -20,6 +20,9 @@ class User(Base):
     profile: Mapped["Profile | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    resume_profile: Mapped["ResumeProfile | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Profile(Base):
@@ -33,6 +36,26 @@ class Profile(Base):
     desired_roles: Mapped[list[str]] = mapped_column(JSON, default=list)
     preferred_countries: Mapped[list[str]] = mapped_column(JSON, default=list)
     user: Mapped[User] = relationship(back_populates="profile")
+
+
+class ResumeProfile(Base):
+    __tablename__ = "resume_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    extracted_text: Mapped[str] = mapped_column(Text)
+    target_roles: Mapped[list[str]] = mapped_column(JSON, default=list)
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list)
+    experience_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    years_experience: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    languages: Mapped[list[str]] = mapped_column(JSON, default=list)
+    preferred_countries: Mapped[list[str]] = mapped_column(JSON, default=list)
+    work_authorization: Mapped[list[str]] = mapped_column(JSON, default=list)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+    user: Mapped[User] = relationship(back_populates="resume_profile")
 
 
 class Job(Base):
@@ -49,4 +72,33 @@ class Job(Base):
     description: Mapped[str] = mapped_column(Text)
     url: Mapped[str] = mapped_column(String(2048))
     employment_type: Mapped[str] = mapped_column(String(80), default="")
+    salary_min: Mapped[float | None] = mapped_column(Float, nullable=True)
+    salary_max: Mapped[float | None] = mapped_column(Float, nullable=True)
+    salary_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    workplace_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    legitimacy_status: Mapped[str] = mapped_column(String(30), default="needs_review", index=True)
+    legitimacy_reasons: Mapped[list[str]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    @property
+    def source_attribution(self) -> str | None:
+        if self.source.lower() == "remotive":
+            return "Jobs provided by Remotive (https://remotive.com/remote-jobs)."
+        return None
+
+
+class Application(Base):
+    __tablename__ = "applications"
+    __table_args__ = (UniqueConstraint("user_id", "job_id", name="uq_application_user_job"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"), index=True)
+    status: Mapped[str] = mapped_column(String(20), index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+    job: Mapped[Job] = relationship()
+    user: Mapped[User] = relationship()

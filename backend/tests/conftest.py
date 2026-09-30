@@ -11,6 +11,11 @@ from app.database import Base, engine
 from app.main import app
 
 
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
 @pytest.fixture(autouse=True)
 def clean_database():
     Base.metadata.drop_all(bind=engine)

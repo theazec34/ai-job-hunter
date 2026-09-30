@@ -12,6 +12,14 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(default=60, ge=5, le=1440)
     cors_origins: str = "http://localhost:3100"
+    llm_api_key: str | None = None
+    llm_base_url: str = "https://llm.4geeks.ai"
+    llm_model: str = "litellm/madrid-spain/openrouter/openai/gpt-6-luna"
+    llm_timeout_seconds: float = Field(default=60.0, ge=1.0, le=60.0)
+    enable_eures_connector: bool = False
+    enable_deterministic_demo_matching: bool = False
+    adzuna_app_id: str | None = None
+    adzuna_app_key: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

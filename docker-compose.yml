@@ -22,6 +22,13 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       CORS_ORIGINS: http://localhost:43123,http://127.0.0.1:43123
       ENVIRONMENT: production
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://llm.4geeks.ai}
+      LLM_MODEL: ${LLM_MODEL:-litellm/madrid-spain/openrouter/openai/gpt-6-luna}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
+      ENABLE_EURES_CONNECTOR: ${ENABLE_EURES_CONNECTOR:-false}
+      ADZUNA_APP_ID: ${ADZUNA_APP_ID:-}
+      ADZUNA_APP_KEY: ${ADZUNA_APP_KEY:-}
     ports:
       - "8100:8000"
     depends_on:
