@@ -4,6 +4,10 @@ A full-stack career assistant that analyses a PDF CV, collects jobs from permitt
 uses an LLM to explain how well up to 30 opportunities fit the candidate. The current product slice
 focuses on the Netherlands, application tracking and transparent housing research links.
 
+The signed-in workspace is organised into **Today**, **Search**, **Applications** and **Profile**.
+Profile contains a persistent, accessible three-step onboarding flow. Search separates all Dutch
+jobs from worldwide remote roles that explicitly accept Netherlands/EU/worldwide candidates.
+
 > AI scores are decision support, not facts. Job legitimacy, salary, rental availability and
 > municipal registration must always be verified independently.
 
@@ -87,7 +91,9 @@ and Docker use PostgreSQL.
 | `POST` | `/api/auth/register` | Create an account and return a JWT |
 | `POST` | `/api/auth/login` | Validate credentials and return a JWT |
 | `GET/PUT` | `/api/profile` | Read or update the authenticated profile |
+| `GET/PUT` | `/api/preferences` | Read or update onboarding and search preferences |
 | `GET/POST` | `/api/jobs` | List or add normalised jobs |
+| `GET` | `/api/jobs/{job_id}` | Return one authenticated job detail |
 | `POST` | `/api/resume` | Validate a PDF, extract text and analyse the CV |
 | `GET` | `/api/resume` | Return the current user's extracted CV profile |
 | `POST` | `/api/jobs/import` | Import and deduplicate an authorised source |

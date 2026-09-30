@@ -10,6 +10,18 @@ practical housing research near each workplace.
 Optimise for a reliable daily job-search routine, not for high user volume, engagement, or
 speculative features.
 
+Current product decisions:
+
+- The primary UI language is English. A Spanish translation may be added without replacing the
+  English portfolio version.
+- Separate invited accounts hold separate profiles. One profile targets programming plus
+  hospitality/logistics fallback roles; the other targets human resources.
+- Default search covers all Netherlands. A separate worldwide-remote scope includes only roles
+  explicitly open to candidates in the Netherlands, EU or worldwide.
+- Initial preferred cities are Amsterdam, Utrecht, Den Haag, Haarlem, Almere, Middelburg,
+  Eindhoven and Rotterdam.
+- The post-MVP mobile distribution target is an installable PWA, not separate native applications.
+
 ## Non-negotiable product rules
 
 1. Netherlands is the primary market. Preserve country, city, remote/hybrid/on-site mode, source,
@@ -19,6 +31,8 @@ speculative features.
    `unknown`/`null` state and explain it in the UI.
 3. A minimum-salary comparison is valid only for normalized annual gross EUR values. Do not compare
    unlike currencies or hourly/monthly values without an explicit, tested normalization step.
+   Gross-to-net calculations are labelled estimates, record the tax year and assumptions, and
+   preserve the source salary. Employer-specific pension or benefits remain unknown unless stated.
 4. Never scrape LinkedIn, Indeed, Funda, Pararius, Kamernet, or another site without documented
    permission. Prefer official/public APIs and preserve required attribution.
 5. EURES uses an unofficial reverse-engineered public portal contract. Keep it feature-flagged,
