@@ -2,6 +2,10 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
+import {
+  BLANK_PREFERENCES,
+  CandidatePreferencesForm,
+} from "@/components/job-hunter/candidate-preferences-form";
 import { WorkspaceNavigation } from "@/components/job-hunter/workspace-navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,9 +16,11 @@ import {
   AIMatch,
   ApplicationStatus,
   authenticate,
+  CandidatePreferences,
   getAIMatches,
   getApplications,
   getHousingAssistance,
+  getPreferences,
   getResume,
   HousingAssistance,
   importJobs,
@@ -22,6 +28,7 @@ import {
   JobSource,
   ResumeProfile,
   saveApplication,
+  savePreferences,
   uploadResume,
 } from "@/lib/api";
 import { CTA_COPY, WorkspaceSection } from "@/lib/ui-copy";
@@ -46,6 +53,7 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [register, setRegister] = useState(false);
   const [resume, setResume] = useState<ResumeProfile | null>(null);
+  const [preferences, setPreferences] = useState<CandidatePreferences | null>(null);
   const [matches, setMatches] = useState<AIMatch[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [applicationStatuses, setApplicationStatuses] = useState<Record<number, ApplicationStatus>>({});
@@ -74,15 +82,26 @@ export default function Home() {
   }, []);
 
   async function loadWorkspace(accessToken: string) {
-    const [resumeResult, applicationsResult] = await Promise.allSettled([
+    const [resumeResult, preferencesResult, applicationsResult] = await Promise.allSettled([
       getResume(accessToken),
+      getPreferences(accessToken),
       getApplications(accessToken),
     ]);
     if (resumeResult.status === "fulfilled") {
       setResume(resumeResult.value);
-    } else {
-      setActiveSection("profile");
     }
+    if (preferencesResult.status === "fulfilled") {
+      setPreferences(preferencesResult.value);
+      setCity(preferencesResult.value.preferred_cities[0] ?? "");
+      setMinimumSalary(
+        preferencesResult.value.minimum_salary_gross_annual?.toString() ?? "",
+      );
+      setWorkplaceMode(
+        preferencesResult.value.workplace_modes.length === 1
+          ? preferencesResult.value.workplace_modes[0]
+          : "",
+      );
+    } else setActiveSection("profile");
     if (applicationsResult.status === "fulfilled") {
       setApplications(applicationsResult.value);
       setApplicationStatuses(
@@ -120,6 +139,25 @@ export default function Home() {
       setMessage("CV analysed successfully. Review the extracted profile below.");
     } catch (error) {
       setMessage(errorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function completeOnboarding(nextPreferences: CandidatePreferences) {
+    if (!token) return;
+    setLoading(true);
+    setMessage("");
+    try {
+      const saved = await savePreferences(token, nextPreferences);
+      setPreferences(saved);
+      setCity(saved.preferred_cities[0] ?? "");
+      setMinimumSalary(saved.minimum_salary_gross_annual?.toString() ?? "");
+      setWorkplaceMode(saved.workplace_modes.length === 1 ? saved.workplace_modes[0] : "");
+      setActiveSection("today");
+      setMessage("Your preferences were saved. You can update them in Profile at any time.");
+    } catch (error) {
+      throw new Error(errorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -423,7 +461,7 @@ export default function Home() {
               <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <h1 id="today-title" className="text-3xl font-bold tracking-tight">
-                    Today
+                    Welcome back
                   </h1>
                   <p className="mt-1 text-slate-600">
                     Your strongest current opportunities in one place.
@@ -433,10 +471,44 @@ export default function Home() {
                   {CTA_COPY.findJobs}
                 </Button>
               </div>
+              {preferences ? (
+                <Card className="mb-6">
+                  <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-600">Your search profile</p>
+                      <p className="mt-1 font-bold">{preferences.target_roles.join(" · ")}</p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {preferences.preferred_cities.join(", ")} · English{" "}
+                        {preferences.english_level.toUpperCase()} · Dutch{" "}
+                        {preferences.dutch_level.toUpperCase()}
+                      </p>
+                    </div>
+                    <Button
+                      className="min-h-11"
+                      variant="outline"
+                      onClick={() => setActiveSection("profile")}
+                    >
+                      Edit profile
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="mb-6 border-dashed">
+                  <CardContent className="pt-6">
+                    <p className="font-bold">Complete your onboarding first</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Tell us what work you want so Today can be personalised.
+                    </p>
+                    <Button className="mt-4 min-h-11" onClick={() => setActiveSection("profile")}>
+                      Complete profile
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
               <div className="mb-6 grid gap-3 sm:grid-cols-3">
                 <Card><CardContent className="pt-5"><strong>{matches.length}</strong><p className="text-sm text-slate-600">Current matches</p></CardContent></Card>
                 <Card><CardContent className="pt-5"><strong>{applications.length}</strong><p className="text-sm text-slate-600">Tracked applications</p></CardContent></Card>
-                <Card><CardContent className="pt-5"><strong>{resume ? "Ready" : "Missing"}</strong><p className="text-sm text-slate-600">CV profile</p></CardContent></Card>
+                <Card><CardContent className="pt-5"><strong>{preferences ? "Ready" : "Missing"}</strong><p className="text-sm text-slate-600">Onboarding</p></CardContent></Card>
               </div>
               {renderMatchCards()}
             </section>
@@ -585,31 +657,26 @@ export default function Home() {
             <section aria-labelledby="profile-title">
               <p className="text-sm font-semibold text-cyan-800">3-STEP SETUP</p>
               <h1 id="profile-title" className="text-3xl font-bold tracking-tight">Profile</h1>
-              <p className="mt-1 text-slate-600">Set up your private matching profile.</p>
-              <div className="mt-6 grid gap-5 lg:grid-cols-3">
-                <Card>
-                  <CardHeader>
-                    <Badge className="w-fit">1</Badge>
-                    <CardTitle>{CTA_COPY.analyseCv}</CardTitle>
-                    <CardDescription>PDF only, maximum 5 MB. The PDF is not stored.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form className="space-y-3" onSubmit={submitResume}>
-                      <Input className="min-h-11" name="resume" type="file"
-                        accept="application/pdf,.pdf" required />
-                      <Button type="submit" disabled={loading} className="min-h-11 w-full">
-                        {CTA_COPY.analyseCv}
-                      </Button>
-                    </form>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <Badge className="w-fit" variant="secondary">2</Badge>
-                    <CardTitle>Review extracted profile</CardTitle>
-                    <CardDescription>Confirm what the matcher will use.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
+              <p className="mt-1 text-slate-600">
+                Your answers stay private and can be updated at any time.
+              </p>
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>CV analysis</CardTitle>
+                  <CardDescription>
+                    Optional for onboarding, required for evidence-based AI matching. PDF up to 5 MB.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-5 lg:grid-cols-2">
+                  <form className="space-y-3" onSubmit={submitResume}>
+                    <Label htmlFor="resume-upload">CV in PDF</Label>
+                    <Input id="resume-upload" className="min-h-11" name="resume" type="file"
+                      accept="application/pdf,.pdf" required />
+                    <Button type="submit" disabled={loading} className="min-h-11">
+                      {CTA_COPY.analyseCv}
+                    </Button>
+                  </form>
+                  <div className="space-y-2 rounded-xl bg-slate-50 p-4 text-sm">
                     {resume ? (
                       <>
                         <p className="font-semibold">{resume.summary ?? "Profile extracted"}</p>
@@ -617,23 +684,25 @@ export default function Home() {
                         <p><strong>Skills:</strong> {resume.skills.join(", ") || "Not found"}</p>
                         <p><strong>Languages:</strong> {resume.languages.join(", ") || "Not found"}</p>
                       </>
-                    ) : <p className="text-slate-600">Complete step 1 first.</p>}
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <Badge className="w-fit" variant="secondary">3</Badge>
-                    <CardTitle>Choose job preferences</CardTitle>
-                    <CardDescription>City, salary and work mode live in Search.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button className="min-h-11 w-full" disabled={!resume}
-                      onClick={() => setActiveSection("search")}>
-                      Set preferences
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
+                    ) : <p className="text-slate-600">No CV has been analysed yet.</p>}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="mt-6">
+                <CardContent className="pt-6">
+                  <CandidatePreferencesForm
+                    key={preferences?.updated_at ?? resume?.updated_at ?? "new"}
+                    initialValue={preferences ?? {
+                      ...BLANK_PREFERENCES,
+                      target_roles: resume?.target_roles ?? [],
+                      skills: resume?.skills ?? [],
+                    }}
+                    loading={loading}
+                    onComplete={completeOnboarding}
+                  />
+                </CardContent>
+              </Card>
             </section>
           )}
         </div>

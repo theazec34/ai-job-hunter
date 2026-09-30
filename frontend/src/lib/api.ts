@@ -52,6 +52,28 @@ export type ResumeProfile = {
   updated_at: string;
 };
 
+export type CandidatePreferences = {
+  id?: number;
+  user_id?: number;
+  target_roles: string[];
+  experience_level: "no_experience" | "junior" | "mid" | "senior" | "lead";
+  skills: string[];
+  job_types: ("technology" | "human_resources" | "hospitality" | "logistics" | "other")[];
+  preferred_cities: string[];
+  workplace_modes: ("onsite" | "hybrid" | "remote")[];
+  schedules: ("full_time" | "part_time" | "temporary" | "internship" | "freelance")[];
+  minimum_salary_gross_annual: number | null;
+  available_from: string | null;
+  lives_in_netherlands: boolean;
+  needs_relocation: boolean;
+  dutch_level: "none" | "a1" | "a2" | "b1" | "b2" | "c1" | "c2" | "native";
+  english_level: "none" | "a1" | "a2" | "b1" | "b2" | "c1" | "c2" | "native";
+  work_authorization: "eu_citizen" | "permit" | "requires_visa" | "unknown";
+  sponsorship_required: boolean;
+  onboarding_complete: boolean;
+  updated_at?: string;
+};
+
 export type JobSource = "arbeitnow" | "remotive" | "eures" | "adzuna_nl";
 
 export type JobImportResult = {
@@ -166,6 +188,16 @@ export const saveProfile = (token: string, profile: Profile) =>
 export const getMatches = (token: string) => request<JobMatch[]>("/api/matches", {}, token);
 
 export const getResume = (token: string) => request<ResumeProfile>("/api/resume", {}, token);
+
+export const getPreferences = (token: string) =>
+  request<CandidatePreferences>("/api/preferences", {}, token);
+
+export const savePreferences = (token: string, preferences: CandidatePreferences) =>
+  request<CandidatePreferences>(
+    "/api/preferences",
+    { method: "PUT", body: JSON.stringify(preferences) },
+    token,
+  );
 
 export const uploadResume = (token: string, file: File) => {
   const body = new FormData();

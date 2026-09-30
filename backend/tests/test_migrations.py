@@ -74,7 +74,14 @@ def test_alembic_adopts_phase_one_database_without_losing_data(tmp_path: Path):
         legacy_email = connection.execute("SELECT email FROM users WHERE id = 1").fetchone()
         revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()
 
-    assert {"users", "profiles", "jobs", "resume_profiles", "applications"} <= tables
+    assert {
+        "users",
+        "profiles",
+        "jobs",
+        "resume_profiles",
+        "applications",
+        "candidate_preferences",
+    } <= tables
     assert {
         "salary_min",
         "salary_max",
@@ -85,4 +92,4 @@ def test_alembic_adopts_phase_one_database_without_losing_data(tmp_path: Path):
         "legitimacy_reasons",
     } <= job_columns
     assert legacy_email == ("legacy@example.com",)
-    assert revision == ("b7e8cc315170",)
+    assert revision == ("2fc6536fe723",)

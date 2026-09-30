@@ -24,7 +24,7 @@ from app.llm import (
     LLMUnavailableError,
     get_llm_provider,
 )
-from app.models import Application, Job, Profile, ResumeProfile, User
+from app.models import Application, CandidatePreferences, Job, Profile, ResumeProfile, User
 from app.resumes import ResumeFileError, extract_pdf_text, read_pdf_request
 from app.schemas import (
     AIMatchRequest,
@@ -32,6 +32,8 @@ from app.schemas import (
     ApplicationResponse,
     ApplicationStatus,
     ApplicationUpsert,
+    CandidatePreferencesInput,
+    CandidatePreferencesResponse,
     HousingAssistanceRequest,
     HousingAssistanceResponse,
     JobImportRequest,
@@ -117,6 +119,40 @@ def upsert_profile(
     db.commit()
     db.refresh(profile)
     return profile
+
+
+@router.get("/preferences", response_model=CandidatePreferencesResponse)
+def get_preferences(
+    current_user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> CandidatePreferences:
+    preferences = db.scalar(
+        select(CandidatePreferences).where(CandidatePreferences.user_id == current_user.id)
+    )
+    if preferences is None:
+        raise HTTPException(status_code=404, detail="Onboarding not completed")
+    return preferences
+
+
+@router.put("/preferences", response_model=CandidatePreferencesResponse)
+def upsert_preferences(
+    payload: CandidatePreferencesInput,
+    current_user: AuthenticatedUser,
+    db: DatabaseSession,
+) -> CandidatePreferences:
+    preferences = db.scalar(
+        select(CandidatePreferences).where(CandidatePreferences.user_id == current_user.id)
+    )
+    values = payload.model_dump()
+    if preferences is None:
+        preferences = CandidatePreferences(user_id=current_user.id, **values)
+        db.add(preferences)
+    else:
+        for key, value in values.items():
+            setattr(preferences, key, value)
+    db.commit()
+    db.refresh(preferences)
+    return preferences
 
 
 @router.post("/jobs", response_model=JobResponse, status_code=status.HTTP_201_CREATED)

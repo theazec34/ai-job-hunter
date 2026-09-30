@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
 
@@ -47,6 +47,46 @@ class ProfileInput(BaseModel):
 class ProfileResponse(ProfileInput):
     id: int
     user_id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CandidatePreferencesInput(BaseModel):
+    target_roles: list[str] = Field(min_length=1, max_length=12)
+    experience_level: Literal["no_experience", "junior", "mid", "senior", "lead"]
+    skills: list[str] = Field(default_factory=list, max_length=50)
+    job_types: list[
+        Literal["technology", "human_resources", "hospitality", "logistics", "other"]
+    ] = Field(min_length=1, max_length=5)
+    preferred_cities: list[str] = Field(min_length=1, max_length=20)
+    workplace_modes: list[Literal["onsite", "hybrid", "remote"]] = Field(
+        min_length=1, max_length=3
+    )
+    schedules: list[Literal["full_time", "part_time", "temporary", "internship", "freelance"]] = (
+        Field(min_length=1, max_length=5)
+    )
+    minimum_salary_gross_annual: float | None = Field(default=None, ge=0, le=1_000_000)
+    available_from: date | None = None
+    lives_in_netherlands: bool
+    needs_relocation: bool
+    dutch_level: Literal["none", "a1", "a2", "b1", "b2", "c1", "c2", "native"]
+    english_level: Literal["none", "a1", "a2", "b1", "b2", "c1", "c2", "native"]
+    work_authorization: Literal["eu_citizen", "permit", "requires_visa", "unknown"]
+    sponsorship_required: bool = False
+    onboarding_complete: bool = True
+
+    @field_validator("target_roles", "skills", "preferred_cities")
+    @classmethod
+    def normalize_preference_items(cls, values: list[str]) -> list[str]:
+        cleaned = [value.strip() for value in values if value.strip()]
+        if any(len(value) > 120 for value in cleaned):
+            raise ValueError("Each preference item must contain at most 120 characters")
+        return list(dict.fromkeys(cleaned))
+
+
+class CandidatePreferencesResponse(CandidatePreferencesInput):
+    id: int
+    user_id: int
+    updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 

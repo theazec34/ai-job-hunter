@@ -1,6 +1,17 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -21,6 +32,9 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     resume_profile: Mapped["ResumeProfile | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    preferences: Mapped["CandidatePreferences | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -56,6 +70,33 @@ class ResumeProfile(Base):
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
     user: Mapped[User] = relationship(back_populates="resume_profile")
+
+
+class CandidatePreferences(Base):
+    __tablename__ = "candidate_preferences"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    target_roles: Mapped[list[str]] = mapped_column(JSON, default=list)
+    experience_level: Mapped[str] = mapped_column(String(30))
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list)
+    job_types: Mapped[list[str]] = mapped_column(JSON, default=list)
+    preferred_cities: Mapped[list[str]] = mapped_column(JSON, default=list)
+    workplace_modes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    schedules: Mapped[list[str]] = mapped_column(JSON, default=list)
+    minimum_salary_gross_annual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    available_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    lives_in_netherlands: Mapped[bool] = mapped_column(Boolean, default=False)
+    needs_relocation: Mapped[bool] = mapped_column(Boolean, default=False)
+    dutch_level: Mapped[str] = mapped_column(String(10))
+    english_level: Mapped[str] = mapped_column(String(10))
+    work_authorization: Mapped[str] = mapped_column(String(30))
+    sponsorship_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+    user: Mapped[User] = relationship(back_populates="preferences")
 
 
 class Job(Base):

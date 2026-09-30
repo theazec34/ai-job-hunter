@@ -730,3 +730,40 @@ def test_housing_assistance_is_static_safe_and_explicitly_not_listings(
         json={"job_city": "Amsterdam", "annual_gross_salary": -1},
     )
     assert invalid.status_code == 422
+
+
+def test_candidate_preferences_are_validated_persisted_and_user_scoped(
+    client: TestClient, auth_headers: dict[str, str]
+):
+    payload = {
+        "target_roles": ["Junior Python Developer", "Cook"],
+        "experience_level": "junior",
+        "skills": ["Python", "FastAPI", "Kitchen operations"],
+        "job_types": ["technology", "hospitality"],
+        "preferred_cities": ["Amsterdam", "Utrecht", "Den Haag"],
+        "workplace_modes": ["onsite", "hybrid", "remote"],
+        "schedules": ["full_time", "part_time"],
+        "minimum_salary_gross_annual": 32_000,
+        "available_from": "2026-11-01",
+        "lives_in_netherlands": False,
+        "needs_relocation": True,
+        "dutch_level": "a1",
+        "english_level": "b2",
+        "work_authorization": "eu_citizen",
+        "sponsorship_required": False,
+        "onboarding_complete": True,
+    }
+    saved = client.put("/api/preferences", headers=auth_headers, json=payload)
+    assert saved.status_code == 200
+    assert saved.json()["target_roles"] == ["Junior Python Developer", "Cook"]
+    assert client.get("/api/preferences", headers=auth_headers).json()["needs_relocation"] is True
+
+    other = client.post(
+        "/api/auth/register",
+        json={"email": "preferences-owner@example.com", "password": "secure-password-two"},
+    )
+    other_headers = {"Authorization": f"Bearer {other.json()['access_token']}"}
+    assert client.get("/api/preferences", headers=other_headers).status_code == 404
+
+    invalid = payload | {"target_roles": [], "english_level": "fluent"}
+    assert client.put("/api/preferences", headers=auth_headers, json=invalid).status_code == 422
