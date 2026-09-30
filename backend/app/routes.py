@@ -164,7 +164,8 @@ def create_job(
     _: AuthenticatedUser,
     db: DatabaseSession,
 ) -> Job:
-    values = payload.model_dump(mode="json")
+    values = payload.model_dump()
+    values["url"] = str(payload.url)
     assessment = assess_legitimacy(
         source=payload.source.lower(),
         company=payload.company,
@@ -356,9 +357,11 @@ async def import_jobs(
             url=str(item.url),
             description=item.description,
         )
+        values = item.model_dump()
+        values["url"] = str(item.url)
         job = Job(
             source=payload.source.value,
-            **item.model_dump(mode="json"),
+            **values,
             legitimacy_status=assessment.status,
             legitimacy_reasons=assessment.reasons,
         )
