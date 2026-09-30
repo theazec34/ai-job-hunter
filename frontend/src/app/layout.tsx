@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -14,7 +14,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "AI Job Hunter",
-  description: "Discover and prioritise professional opportunities across Europe.",
+  description: "Private job search and application tracking for the Netherlands.",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon.svg" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
