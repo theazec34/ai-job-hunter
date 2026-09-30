@@ -211,7 +211,7 @@ export default function Home() {
                 className="border-slate-700 bg-slate-950 text-slate-100"
                 value={password} onChange={(event) => setPassword(event.target.value)} />
               {message && <p className="text-sm text-amber-300">{message}</p>}
-              <Button disabled={loading} className="w-full bg-cyan-400 text-slate-950">
+              <Button type="submit" disabled={loading} className="w-full bg-cyan-400 text-slate-950">
                 {loading ? "Working…" : register ? "Create account" : "Sign in"}
               </Button>
               <button type="button" className="w-full rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-800"
@@ -250,7 +250,7 @@ export default function Home() {
             <CardContent>
               <form className="space-y-3" onSubmit={submitResume}>
                 <Input name="resume" type="file" accept="application/pdf,.pdf" required />
-                <Button disabled={loading} className="w-full">Upload and analyse</Button>
+                <Button type="submit" disabled={loading} className="w-full">Upload and analyse</Button>
               </form>
               {resume && (
                 <div className="mt-4 space-y-2 rounded-lg bg-slate-100 p-3 text-sm">
