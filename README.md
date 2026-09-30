@@ -24,6 +24,7 @@ Requirements: Docker with Docker Compose.
 ```bash
 cp .env.example .env
 # Replace POSTGRES_PASSWORD, JWT_SECRET and LLM_API_KEY with private values.
+# Replace REGISTRATION_ALLOWLIST with the two invited account emails.
 docker compose up --build
 ```
 
@@ -99,6 +100,11 @@ Every route except registration, login and health requires `Authorization: Beare
 Progressed applications (`applied`, `interview`, `rejected`, `offer` or `withdrawn`) are excluded
 from later AI matching. A `saved` job remains eligible.
 
+Production Compose is invite-only. `REGISTRATION_ALLOWLIST` contains the exact comma-separated
+emails permitted to create accounts. Two Gmail aliases such as `name+alfredo@gmail.com` and
+`name+ester@gmail.com` arrive in the same inbox while remaining distinct application accounts.
+Each person chooses their own password; passwords and invitation emails are never committed.
+
 ## Job sources and risk screening
 
 - **Arbeitnow:** public job-board API.
@@ -157,6 +163,7 @@ Never commit `.env`. The example files document:
   and OpenAI-compatible gateway settings.
 - `ENABLE_EURES_CONNECTOR`: opt in to the experimental EURES portal connector.
 - `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`: optional official Adzuna API credentials.
+- `REQUIRE_INVITE`, `REGISTRATION_ALLOWLIST`: close public registration and list invited emails.
 
 ## Known limitations
 

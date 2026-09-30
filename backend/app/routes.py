@@ -72,6 +72,9 @@ ConnectorDependency = Annotated[ConnectorResolver, Depends(get_connector_resolve
 @router.post("/auth/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: DatabaseSession) -> TokenResponse:
     email = payload.email.lower()
+    settings = get_settings()
+    if settings.require_invite and email not in settings.allowed_registration_emails:
+        raise HTTPException(status_code=403, detail="Registration requires an invitation")
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 

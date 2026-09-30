@@ -20,12 +20,22 @@ class Settings(BaseSettings):
     enable_deterministic_demo_matching: bool = False
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None
+    require_invite: bool = False
+    registration_allowlist: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def allowed_registration_emails(self) -> set[str]:
+        return {
+            email.strip().lower()
+            for email in self.registration_allowlist.split(",")
+            if email.strip()
+        }
 
 
 @lru_cache

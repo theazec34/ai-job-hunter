@@ -4,6 +4,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
 from app.connectors import (
     AdzunaNLConnector,
     ArbeitnowConnector,
@@ -780,3 +781,26 @@ def test_candidate_preferences_are_validated_persisted_and_user_scoped(
 
     invalid = payload | {"target_roles": [], "english_level": "fluent"}
     assert client.put("/api/preferences", headers=auth_headers, json=invalid).status_code == 422
+
+
+def test_invite_only_registration_uses_email_allowlist(client: TestClient):
+    settings = get_settings()
+    original_required = settings.require_invite
+    original_allowlist = settings.registration_allowlist
+    settings.require_invite = True
+    settings.registration_allowlist = "invited+alfredo@gmail.com,invited+ester@gmail.com"
+    try:
+        blocked = client.post(
+            "/api/auth/register",
+            json={"email": "unknown@example.com", "password": "secure-password-two"},
+        )
+        invited = client.post(
+            "/api/auth/register",
+            json={"email": "invited+alfredo@gmail.com", "password": "secure-password-two"},
+        )
+    finally:
+        settings.require_invite = original_required
+        settings.registration_allowlist = original_allowlist
+
+    assert blocked.status_code == 403
+    assert invited.status_code == 201
