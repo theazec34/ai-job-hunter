@@ -261,6 +261,7 @@ async def test_remotive_separates_dutch_and_worldwide_remote_jobs():
                 "description": "<p>Build Python services.</p>",
                 "url": "https://example.com/worldwide",
                 "job_type": "full_time",
+                "publication_date": "2026-09-29T10:00:00Z",
             },
             {
                 "id": 2,
@@ -286,6 +287,7 @@ async def test_remotive_separates_dutch_and_worldwide_remote_jobs():
     assert [job.external_id for job in dutch] == ["2"]
     assert {job.external_id for job in worldwide} == {"1", "2"}
     assert {job.remote_scope for job in worldwide} == {"netherlands", "worldwide"}
+    assert worldwide[0].published_at is not None
 
 
 class FakeConnector:

@@ -105,6 +105,7 @@ class JobInput(BaseModel):
     salary_currency: str | None = Field(default=None, pattern="^[A-Za-z]{3}$")
     workplace_mode: Literal["onsite", "hybrid", "remote"] | None = None
     remote_scope: Literal["netherlands", "eu", "worldwide", "unknown"] | None = None
+    published_at: datetime | None = None
 
     @field_validator("url")
     @classmethod

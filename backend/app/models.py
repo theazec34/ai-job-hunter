@@ -120,6 +120,7 @@ class Job(Base):
     remote_scope: Mapped[str | None] = mapped_column(String(20), nullable=True)
     legitimacy_status: Mapped[str] = mapped_column(String(30), default="needs_review", index=True)
     legitimacy_reasons: Mapped[list[str]] = mapped_column(JSON, default=list)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     @property

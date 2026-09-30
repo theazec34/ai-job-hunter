@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from html.parser import HTMLParser
 from typing import Protocol
 from urllib.parse import quote
@@ -125,6 +126,16 @@ def country_for_location(value: str) -> str:
     return "Unknown"
 
 
+def parse_datetime(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
 class NormalizedJob(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -143,6 +154,7 @@ class NormalizedJob(BaseModel):
     remote_scope: str | None = Field(
         default=None, pattern="^(netherlands|eu|worldwide|unknown)$"
     )
+    published_at: datetime | None = None
 
     @field_validator("url")
     @classmethod
@@ -243,6 +255,7 @@ class ArbeitnowConnector(BaseConnector):
                         employment_type=", ".join(row.get("job_types") or []),
                         workplace_mode="remote" if remote else None,
                         remote_scope=remote_scope_for_location(location) if remote else None,
+                        published_at=parse_datetime(row.get("created_at")),
                     )
                 )
             except (ValueError, TypeError):
@@ -284,6 +297,7 @@ class RemotiveConnector(BaseConnector):
                         employment_type=str(row.get("job_type", "")),
                         workplace_mode="remote",
                         remote_scope=remote_scope_for_location(location),
+                        published_at=parse_datetime(row.get("publication_date")),
                     )
                 )
             except (ValueError, TypeError):
@@ -338,6 +352,7 @@ class AdzunaNLConnector(BaseConnector):
                             else None
                         ),
                         remote_scope=None,
+                        published_at=parse_datetime(row.get("created")),
                     )
                 )
             except (ValueError, TypeError, AttributeError):
@@ -407,6 +422,7 @@ class EuresConnector(BaseConnector):
                             f"{quote(external_id, safe='')}?lang=en"
                         ),
                         employment_type=str(row.get("positionOfferingCode", "")),
+                        published_at=parse_datetime(row.get("publicationDate")),
                     )
                 )
             except (ValueError, TypeError, AttributeError):

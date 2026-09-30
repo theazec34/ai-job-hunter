@@ -28,6 +28,7 @@ export type Job = {
   legitimacy_status: "source_verified" | "needs_review" | "rejected";
   legitimacy_reasons: string[];
   source_attribution: string | null;
+  published_at: string | null;
   created_at: string;
 };
 
@@ -230,6 +231,9 @@ export const getAIMatches = (token: string, filters: MatchFilters) =>
 
 export const getApplications = (token: string) =>
   request<JobApplication[]>("/api/applications", {}, token);
+
+export const getJobs = (token: string, country = "NL", limit = 30) =>
+  request<Job[]>(`/api/jobs?country=${encodeURIComponent(country)}&limit=${limit}`, {}, token);
 
 export const saveApplication = (
   token: string,

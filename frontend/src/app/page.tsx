@@ -20,11 +20,13 @@ import {
   getAIMatches,
   getApplications,
   getHousingAssistance,
+  getJobs,
   getPreferences,
   getResume,
   HousingAssistance,
   importJobs,
   JobApplication,
+  Job,
   JobSource,
   ResumeProfile,
   saveApplication,
@@ -40,11 +42,17 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong";
 }
 
-function salary(match: AIMatch) {
-  const { job } = match;
+function jobSalary(job: Job) {
   if (job.salary_min === null && job.salary_max === null) return "Salary not published";
   const values = [job.salary_min, job.salary_max].filter((value) => value !== null);
   return `${job.salary_currency ?? ""} ${values.map((value) => value?.toLocaleString()).join("–")}`;
+}
+
+function publicationDate(job: Job) {
+  if (!job.published_at) return "Publication date not provided";
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(
+    new Date(job.published_at),
+  );
 }
 
 export default function Home() {
@@ -56,6 +64,7 @@ export default function Home() {
   const [preferences, setPreferences] = useState<CandidatePreferences | null>(null);
   const [matches, setMatches] = useState<AIMatch[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
+  const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [applicationStatuses, setApplicationStatuses] = useState<Record<number, ApplicationStatus>>({});
   const [housing, setHousing] = useState<Record<number, HousingAssistance>>({});
   const [source, setSource] = useState<JobSource>("arbeitnow");
@@ -82,10 +91,12 @@ export default function Home() {
   }, []);
 
   async function loadWorkspace(accessToken: string) {
-    const [resumeResult, preferencesResult, applicationsResult] = await Promise.allSettled([
+    const [resumeResult, preferencesResult, applicationsResult, jobsResult] =
+      await Promise.allSettled([
       getResume(accessToken),
       getPreferences(accessToken),
       getApplications(accessToken),
+      getJobs(accessToken),
     ]);
     if (resumeResult.status === "fulfilled") {
       setResume(resumeResult.value);
@@ -108,6 +119,7 @@ export default function Home() {
         Object.fromEntries(applicationsResult.value.map((item) => [item.job_id, item.status])),
       );
     }
+    if (jobsResult.status === "fulfilled") setRecentJobs(jobsResult.value);
   }
 
   async function submitAuth(event: FormEvent) {
@@ -179,6 +191,10 @@ export default function Home() {
         country: "NL",
         scope: searchScope,
         limit: 30,
+      });
+      setRecentJobs((current) => {
+        const importedIds = new Set(imported.jobs.map((job) => job.id));
+        return [...imported.jobs, ...current.filter((job) => !importedIds.has(job.id))].slice(0, 30);
       });
       const result = await getAIMatches(token, {
         scope: searchScope,
@@ -270,7 +286,11 @@ export default function Home() {
               <h3 className="mt-3 text-xl font-bold">{match.job.title}</h3>
               <p className="text-slate-600">{match.job.company} · {match.job.location}</p>
               <p className="mt-1 text-sm font-medium">
-                {salary(match)} · {match.job.workplace_mode ?? "Mode unknown"}
+                {jobSalary(match.job)} · {match.job.workplace_mode ?? "Mode unknown"}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                {match.job.employment_type || "Contract not provided"} ·{" "}
+                {publicationDate(match.job)}
               </p>
               <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
                 <div className="rounded-lg bg-emerald-50 p-3 text-emerald-950">
@@ -510,7 +530,64 @@ export default function Home() {
                 <Card><CardContent className="pt-5"><strong>{applications.length}</strong><p className="text-sm text-slate-600">Tracked applications</p></CardContent></Card>
                 <Card><CardContent className="pt-5"><strong>{preferences ? "Ready" : "Missing"}</strong><p className="text-sm text-slate-600">Onboarding</p></CardContent></Card>
               </div>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Jobs for you</h2>
+                <Badge variant="secondary">{matches.length}</Badge>
+              </div>
               {renderMatchCards()}
+              <div className="mb-4 mt-10 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Recent jobs</h2>
+                  <p className="text-sm text-slate-600">Latest imported Dutch opportunities.</p>
+                </div>
+                <Button className="min-h-11" variant="outline"
+                  onClick={() => setActiveSection("search")}>
+                  Search jobs
+                </Button>
+              </div>
+              {recentJobs.length === 0 ? (
+                <Card className="border-dashed py-10 text-center">
+                  <CardContent>
+                    <p className="font-semibold">No recent jobs imported yet.</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Start a search to collect current opportunities.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {recentJobs.slice(0, 6).map((job) => (
+                    <Card key={job.id}>
+                      <CardContent className="pt-6">
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline">{job.source}</Badge>
+                          <Badge variant="secondary">No compatibility score</Badge>
+                        </div>
+                        <h3 className="mt-3 text-lg font-bold">{job.title}</h3>
+                        <p className="text-sm text-slate-600">{job.company} · {job.location}</p>
+                        <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+                          <div><dt className="font-semibold">Work mode</dt><dd>{job.workplace_mode ?? "Not provided"}</dd></div>
+                          <div><dt className="font-semibold">Contract</dt><dd>{job.employment_type || "Not provided"}</dd></div>
+                          <div><dt className="font-semibold">Salary</dt><dd>{jobSalary(job)}</dd></div>
+                          <div><dt className="font-semibold">Published</dt><dd>{publicationDate(job)}</dd></div>
+                        </dl>
+                        <div className="mt-5 flex flex-wrap gap-2">
+                          <Button className="min-h-11" render={
+                            <a href={job.url} target="_blank" rel="noreferrer" />
+                          }>
+                            View original job
+                          </Button>
+                          <Button className="min-h-11" variant="outline"
+                            disabled={applicationStatuses[job.id] === "saved"}
+                            onClick={() => { void updateApplication(job.id, "saved"); }}>
+                            {applicationStatuses[job.id] === "saved" ? "Saved" : CTA_COPY.save}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 
