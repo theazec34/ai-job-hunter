@@ -113,6 +113,7 @@ export type MatchFilters = {
 export type ApplicationStatus =
   | "saved"
   | "applied"
+  | "in_progress"
   | "interview"
   | "rejected"
   | "offer"
@@ -234,6 +235,9 @@ export const getApplications = (token: string) =>
 
 export const getJobs = (token: string, country = "NL", limit = 30) =>
   request<Job[]>(`/api/jobs?country=${encodeURIComponent(country)}&limit=${limit}`, {}, token);
+
+export const getJob = (token: string, jobId: number) =>
+  request<Job>(`/api/jobs/${jobId}`, {}, token);
 
 export const saveApplication = (
   token: string,

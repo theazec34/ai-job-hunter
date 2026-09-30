@@ -438,6 +438,7 @@ async def ai_matches(
 
     excluded_statuses = [
         ApplicationStatus.APPLIED.value,
+        ApplicationStatus.IN_PROGRESS.value,
         ApplicationStatus.INTERVIEW.value,
         ApplicationStatus.REJECTED.value,
         ApplicationStatus.OFFER.value,
@@ -538,6 +539,18 @@ async def ai_matches(
             )
         )
     return results
+
+
+@router.get("/jobs/{job_id}", response_model=JobResponse)
+def get_job(
+    job_id: int,
+    _: AuthenticatedUser,
+    db: DatabaseSession,
+) -> Job:
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 @router.get("/applications", response_model=list[ApplicationResponse])

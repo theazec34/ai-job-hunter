@@ -407,6 +407,17 @@ def test_ai_matching_requires_analysed_cv(client: TestClient, auth_headers: dict
     assert response.status_code == 400
 
 
+def test_job_detail_requires_authentication_and_returns_source_data(
+    client: TestClient, auth_headers: dict[str, str]
+):
+    job = create_job(client, auth_headers, "detail").json()
+    assert client.get(f"/api/jobs/{job['id']}").status_code == 401
+    detail = client.get(f"/api/jobs/{job['id']}", headers=auth_headers)
+    assert detail.status_code == 200
+    assert detail.json()["url"] == "https://example.com/jobs/detail"
+    assert client.get("/api/jobs/999999", headers=auth_headers).status_code == 404
+
+
 def test_ai_matching_chunks_thirty_candidates(
     client: TestClient, auth_headers: dict[str, str], fake_llm: FakeLLM
 ):

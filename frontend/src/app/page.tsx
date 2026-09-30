@@ -22,15 +22,18 @@ import {
   getHousingAssistance,
   getJobs,
   getPreferences,
+  getProfile,
   getResume,
   HousingAssistance,
   importJobs,
   JobApplication,
   Job,
   JobSource,
+  Profile,
   ResumeProfile,
   saveApplication,
   savePreferences,
+  saveProfile,
   uploadResume,
 } from "@/lib/api";
 import { CTA_COPY, WorkspaceSection } from "@/lib/ui-copy";
@@ -55,12 +58,21 @@ function publicationDate(job: Job) {
   );
 }
 
+const BLANK_PROFILE: Profile = {
+  name: "",
+  headline: "",
+  skills: [],
+  desired_roles: [],
+  preferred_countries: ["NL"],
+};
+
 export default function Home() {
   const [token, setToken] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [register, setRegister] = useState(false);
   const [resume, setResume] = useState<ResumeProfile | null>(null);
+  const [profile, setProfile] = useState<Profile>(BLANK_PROFILE);
   const [preferences, setPreferences] = useState<CandidatePreferences | null>(null);
   const [matches, setMatches] = useState<AIMatch[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
@@ -91,10 +103,11 @@ export default function Home() {
   }, []);
 
   async function loadWorkspace(accessToken: string) {
-    const [resumeResult, preferencesResult, applicationsResult, jobsResult] =
+    const [resumeResult, preferencesResult, profileResult, applicationsResult, jobsResult] =
       await Promise.allSettled([
       getResume(accessToken),
       getPreferences(accessToken),
+      getProfile(accessToken),
       getApplications(accessToken),
       getJobs(accessToken),
     ]);
@@ -113,6 +126,7 @@ export default function Home() {
           : "",
       );
     } else setActiveSection("profile");
+    if (profileResult.status === "fulfilled") setProfile(profileResult.value);
     if (applicationsResult.status === "fulfilled") {
       setApplications(applicationsResult.value);
       setApplicationStatuses(
@@ -170,6 +184,27 @@ export default function Home() {
       setMessage("Your preferences were saved. You can update them in Profile at any time.");
     } catch (error) {
       throw new Error(errorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitCandidateIdentity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    setLoading(true);
+    setMessage("");
+    try {
+      const saved = await saveProfile(token, {
+        ...profile,
+        skills: preferences?.skills ?? profile.skills,
+        desired_roles: preferences?.target_roles ?? profile.desired_roles,
+        preferred_countries: ["NL"],
+      });
+      setProfile(saved);
+      setMessage("Your profile details were saved.");
+    } catch (error) {
+      setMessage(errorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -328,9 +363,9 @@ export default function Home() {
             </div>
             <div className="flex shrink-0 flex-col gap-2">
               <Button className="min-h-11" render={
-                <a href={match.job.url} target="_blank" rel="noreferrer" />
+                <a href={`/jobs/${match.job.id}`} />
               }>
-                View original job
+                View details
               </Button>
               <select
                 className={`${fieldClass} min-h-11`}
@@ -343,6 +378,7 @@ export default function Home() {
                 <option value="" disabled>Track status</option>
                 <option value="saved">{CTA_COPY.save}</option>
                 <option value="applied">Applied</option>
+                <option value="in_progress">In progress</option>
                 <option value="interview">Interview</option>
                 <option value="rejected">Rejected</option>
                 <option value="offer">Offer</option>
@@ -573,9 +609,9 @@ export default function Home() {
                         </dl>
                         <div className="mt-5 flex flex-wrap gap-2">
                           <Button className="min-h-11" render={
-                            <a href={job.url} target="_blank" rel="noreferrer" />
+                            <a href={`/jobs/${job.id}`} />
                           }>
-                            View original job
+                            View details
                           </Button>
                           <Button className="min-h-11" variant="outline"
                             disabled={applicationStatuses[job.id] === "saved"}
@@ -717,12 +753,39 @@ export default function Home() {
                         <p className="text-sm text-slate-600">
                           {application.job.company} · {application.job.location}
                         </p>
+                        <p className="mt-1 text-xs text-slate-600">
+                          Tracked since{" "}
+                          {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(
+                            new Date(application.created_at),
+                          )}
+                        </p>
                       </div>
-                      <Button className="min-h-11" variant="outline" render={
-                        <a href={application.job.url} target="_blank" rel="noreferrer" />
-                      }>
-                        View original job
-                      </Button>
+                      <div className="flex flex-col gap-2 sm:items-end">
+                        <Label htmlFor={`application-${application.id}`}>Status</Label>
+                        <select
+                          id={`application-${application.id}`}
+                          className={fieldClass}
+                          value={application.status}
+                          onChange={(event) => {
+                            void updateApplication(
+                              application.job_id,
+                              event.target.value as ApplicationStatus,
+                            );
+                          }}
+                        >
+                          <option value="saved">Saved</option>
+                          <option value="applied">Applied</option>
+                          <option value="in_progress">In progress</option>
+                          <option value="interview">Interview</option>
+                          <option value="offer">Offer</option>
+                          <option value="rejected">Rejected</option>
+                        </select>
+                        <Button className="min-h-11" variant="outline" render={
+                          <a href={`/jobs/${application.job.id}`} />
+                        }>
+                          View details
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -737,6 +800,47 @@ export default function Home() {
               <p className="mt-1 text-slate-600">
                 Your answers stay private and can be updated at any time.
               </p>
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Personal details</CardTitle>
+                  <CardDescription>
+                    Your avatar uses initials; no profile photo is uploaded or shared.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form className="grid gap-5 sm:grid-cols-[72px_1fr]" onSubmit={submitCandidateIdentity}>
+                    <div
+                      aria-hidden="true"
+                      className="grid size-16 place-items-center rounded-full bg-cyan-100 text-xl font-black text-cyan-900"
+                    >
+                      {(profile.name || "Candidate").split(/\s+/).slice(0, 2)
+                        .map((part) => part[0]?.toUpperCase()).join("")}
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="profile-name">Name</Label>
+                        <Input id="profile-name" className="mt-2 min-h-11" required
+                          value={profile.name}
+                          onChange={(event) => setProfile({ ...profile, name: event.target.value })} />
+                      </div>
+                      <div>
+                        <Label htmlFor="profile-headline">Professional headline</Label>
+                        <Input id="profile-headline" className="mt-2 min-h-11"
+                          placeholder="Junior developer open to logistics roles"
+                          value={profile.headline}
+                          onChange={(event) => {
+                            setProfile({ ...profile, headline: event.target.value });
+                          }} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Button type="submit" className="min-h-11" disabled={loading}>
+                          Save personal details
+                        </Button>
+                      </div>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
               <Card className="mt-6">
                 <CardHeader>
                   <CardTitle>CV analysis</CardTitle>

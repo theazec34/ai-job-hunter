@@ -259,6 +259,7 @@ class AIMatchRequest(BaseModel):
 class ApplicationStatus(StrEnum):
     SAVED = "saved"
     APPLIED = "applied"
+    IN_PROGRESS = "in_progress"
     INTERVIEW = "interview"
     REJECTED = "rejected"
     OFFER = "offer"
