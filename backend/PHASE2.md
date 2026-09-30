@@ -24,6 +24,6 @@
   no listing or registration guarantee.
 - Legitimacy status is deterministic risk screening based on connector provenance and fraud
   signals. It is not a guarantee that a job or employer is legitimate.
-- Startup uses `Base.metadata.create_all()` for fresh demo databases. It does not migrate an
-  existing schema. Existing phase-1 database volumes must be recreated before running phase 2;
-  use Alembic before retaining production data across schema versions.
+- Alembic owns schema changes. The baseline migration creates a fresh schema or adopts an
+  unmanaged phase-one database while preserving existing users, profiles and jobs. Run
+  `alembic upgrade head` before starting the API.

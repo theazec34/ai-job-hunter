@@ -45,6 +45,7 @@ cp .env.example .env
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+alembic upgrade head
 uvicorn app.main:app --reload --port 8100
 ```
 
@@ -159,10 +160,11 @@ Never commit `.env`. The example files document:
 
 ## Known limitations
 
-- Tables are created on startup; schema migrations are the next backend milestone.
-- Existing phase-one database volumes are not migrated automatically. Until Alembic migrations are
-  added, recreate the local development volume before using this schema (`docker compose down -v`);
-  this deletes local data.
+- Alembic owns the database schema. Run `alembic upgrade head` after pulling changes and before
+  starting the API. The baseline migration adopts an existing phase-one schema without deleting
+  users, profiles or jobs.
+- Review generated migrations before applying them to retained data and take a database backup
+  before production upgrades.
 - Refresh tokens, password recovery and administrative roles are not implemented.
 - The JWT is stored in `sessionStorage`, so the browser session ends with the tab. A future BFF
   can move it into an `HttpOnly` cookie with CSRF protection.
