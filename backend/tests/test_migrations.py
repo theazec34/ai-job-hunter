@@ -80,8 +80,9 @@ def test_alembic_adopts_phase_one_database_without_losing_data(tmp_path: Path):
         "salary_max",
         "salary_currency",
         "workplace_mode",
+        "remote_scope",
         "legitimacy_status",
         "legitimacy_reasons",
     } <= job_columns
     assert legacy_email == ("legacy@example.com",)
-    assert revision == ("d3bc58a00d0d",)
+    assert revision == ("b7e8cc315170",)

@@ -289,6 +289,7 @@ async def import_jobs(
         normalized = await connector.fetch(
             query=payload.query,
             country=payload.country,
+            scope=payload.scope,
             page=payload.page,
             limit=payload.limit,
         )
@@ -414,8 +415,13 @@ async def ai_matches(
         Job.legitimacy_status.in_(["source_verified", "needs_review"]),
         Job.id.not_in(excluded_jobs),
     )
-    if payload.country:
-        statement = statement.where(Job.country.ilike(payload.country))
+    if payload.scope == "netherlands":
+        statement = statement.where(Job.country == "NL")
+    else:
+        statement = statement.where(
+            Job.workplace_mode == "remote",
+            Job.remote_scope.in_(["netherlands", "eu", "worldwide"]),
+        )
     if payload.city:
         escaped_city = (
             payload.city.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

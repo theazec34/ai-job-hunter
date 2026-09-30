@@ -24,6 +24,7 @@ export type Job = {
   salary_max: number | null;
   salary_currency: string | null;
   workplace_mode: "onsite" | "hybrid" | "remote" | null;
+  remote_scope: "netherlands" | "eu" | "worldwide" | "unknown" | null;
   legitimacy_status: "source_verified" | "needs_review" | "rejected";
   legitimacy_reasons: string[];
   source_attribution: string | null;
@@ -77,6 +78,7 @@ export type AIMatch = {
 };
 
 export type MatchFilters = {
+  scope: "netherlands" | "worldwide_remote";
   country?: string;
   city?: string;
   minimum_salary?: number;
@@ -173,7 +175,13 @@ export const uploadResume = (token: string, file: File) => {
 
 export const importJobs = (
   token: string,
-  payload: { source: JobSource; query: string; country: string; limit: number },
+  payload: {
+    source: JobSource;
+    query: string;
+    country: string;
+    scope: "netherlands" | "worldwide_remote";
+    limit: number;
+  },
 ) =>
   request<JobImportResult>(
     "/api/jobs/import",

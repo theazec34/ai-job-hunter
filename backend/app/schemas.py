@@ -64,6 +64,7 @@ class JobInput(BaseModel):
     salary_max: float | None = Field(default=None, ge=0, le=10_000_000)
     salary_currency: str | None = Field(default=None, pattern="^[A-Za-z]{3}$")
     workplace_mode: Literal["onsite", "hybrid", "remote"] | None = None
+    remote_scope: Literal["netherlands", "eu", "worldwide", "unknown"] | None = None
 
     @field_validator("url")
     @classmethod
@@ -152,6 +153,7 @@ class JobImportRequest(BaseModel):
     source: JobSource
     query: str = Field(default="", max_length=100)
     country: str = Field(default="NL", min_length=2, max_length=2)
+    scope: Literal["netherlands", "worldwide_remote"] = "netherlands"
     page: int = Field(default=1, ge=1, le=20)
     limit: int = Field(default=20, ge=1, le=50)
 
@@ -204,6 +206,7 @@ class AIMatchResponse(LLMJobMatch):
 
 
 class AIMatchRequest(BaseModel):
+    scope: Literal["netherlands", "worldwide_remote"] = "netherlands"
     country: str | None = Field(default=None, max_length=100)
     city: str | None = Field(default=None, min_length=1, max_length=100)
     minimum_salary: float | None = Field(default=None, ge=0, le=10_000_000)

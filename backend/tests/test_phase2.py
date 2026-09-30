@@ -4,7 +4,13 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.connectors import AdzunaNLConnector, ArbeitnowConnector, EuresConnector, NormalizedJob
+from app.connectors import (
+    AdzunaNLConnector,
+    ArbeitnowConnector,
+    EuresConnector,
+    NormalizedJob,
+    RemotiveConnector,
+)
 from app.legitimacy import assess_legitimacy
 from app.llm import (
     LLMResponseError,
@@ -222,14 +228,64 @@ async def test_arbeitnow_mapping_uses_mocked_http_and_discards_unsafe_url():
                 "description": "Bad",
                 "url": "http://example.com/job",
             },
+            {
+                "slug": "foreign",
+                "title": "Python Engineer",
+                "company_name": "Foreign GmbH",
+                "location": "Karlsruhe",
+                "description": "<p>Build Python systems.</p>",
+                "url": "https://example.com/foreign-job",
+                "remote": False,
+            },
         ]
     }
     transport = httpx.MockTransport(lambda _: httpx.Response(200, json=payload))
     connector = ArbeitnowConnector(httpx.AsyncClient(transport=transport))
-    jobs = await connector.fetch(query="Python", country="NL", page=1, limit=10)
+    jobs = await connector.fetch(
+        query="Python", country="NL", scope="netherlands", page=1, limit=10
+    )
     assert len(jobs) == 1
     assert jobs[0].description == "Build Python systems."
     assert jobs[0].country == "NL"
+
+
+@pytest.mark.anyio
+async def test_remotive_separates_dutch_and_worldwide_remote_jobs():
+    payload = {
+        "jobs": [
+            {
+                "id": 1,
+                "title": "Remote Python Engineer",
+                "company_name": "Worldwide Inc",
+                "candidate_required_location": "Worldwide",
+                "description": "<p>Build Python services.</p>",
+                "url": "https://example.com/worldwide",
+                "job_type": "full_time",
+            },
+            {
+                "id": 2,
+                "title": "Dutch Python Engineer",
+                "company_name": "Dutch BV",
+                "candidate_required_location": "Netherlands",
+                "description": "<p>Build Python services.</p>",
+                "url": "https://example.com/netherlands",
+                "job_type": "full_time",
+            },
+        ]
+    }
+    transport = httpx.MockTransport(lambda _: httpx.Response(200, json=payload))
+    connector = RemotiveConnector(httpx.AsyncClient(transport=transport))
+
+    dutch = await connector.fetch(
+        query="Python", country="NL", scope="netherlands", page=1, limit=10
+    )
+    worldwide = await connector.fetch(
+        query="Python", country="NL", scope="worldwide_remote", page=1, limit=10
+    )
+
+    assert [job.external_id for job in dutch] == ["2"]
+    assert {job.external_id for job in worldwide} == {"1", "2"}
+    assert {job.remote_scope for job in worldwide} == {"netherlands", "worldwide"}
 
 
 class FakeConnector:
@@ -546,7 +602,9 @@ async def test_eures_reverse_engineered_post_contract_and_observed_response_mapp
         return httpx.Response(200, json=observed_response)
 
     connector = EuresConnector(httpx.AsyncClient(transport=httpx.MockTransport(handler)))
-    jobs = await connector.fetch(query="python", country="NL", page=2, limit=10)
+    jobs = await connector.fetch(
+        query="python", country="NL", scope="netherlands", page=2, limit=10
+    )
     body = captured["body"]
     assert captured["method"] == "POST"
     assert captured["url"] == (
@@ -622,7 +680,9 @@ async def test_adzuna_maps_reliable_salary_fields_without_inventing_unknowns():
             transport=httpx.MockTransport(lambda _: httpx.Response(200, json=response))
         ),
     )
-    jobs = await connector.fetch(query="", country="NL", page=1, limit=10)
+    jobs = await connector.fetch(
+        query="", country="NL", scope="netherlands", page=1, limit=10
+    )
     assert jobs[0].salary_min == 55_000
     assert jobs[0].salary_max == 72_000
     assert jobs[0].salary_currency == "EUR"

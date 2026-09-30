@@ -51,6 +51,9 @@ export default function Home() {
   const [applicationStatuses, setApplicationStatuses] = useState<Record<number, ApplicationStatus>>({});
   const [housing, setHousing] = useState<Record<number, HousingAssistance>>({});
   const [source, setSource] = useState<JobSource>("arbeitnow");
+  const [searchScope, setSearchScope] = useState<"netherlands" | "worldwide_remote">(
+    "netherlands",
+  );
   const [query, setQuery] = useState("Python");
   const [city, setCity] = useState("");
   const [minimumSalary, setMinimumSalary] = useState("");
@@ -132,8 +135,15 @@ export default function Home() {
     setLoading(true);
     setMessage("");
     try {
-      const imported = await importJobs(token, { source, query, country: "NL", limit: 30 });
+      const imported = await importJobs(token, {
+        source,
+        query,
+        country: "NL",
+        scope: searchScope,
+        limit: 30,
+      });
       const result = await getAIMatches(token, {
+        scope: searchScope,
         country: "NL",
         city: city || undefined,
         minimum_salary: minimumSalary ? Number(minimumSalary) : undefined,
@@ -437,11 +447,29 @@ export default function Home() {
               <p className="text-sm font-semibold text-cyan-800">NETHERLANDS FIRST</p>
               <h1 id="search-title" className="text-3xl font-bold tracking-tight">Search</h1>
               <p className="mt-1 text-slate-600">
-                Search Dutch roles now. Worldwide remote roles will be added only after location
-                validation is reliable.
+                Search across the Netherlands or switch to remote roles explicitly available from
+                the Netherlands or EU.
               </p>
               <Card className="my-6">
                 <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="scope">Search area</Label>
+                    <select
+                      id="scope"
+                      className={`${fieldClass} mt-2 min-h-11`}
+                      value={searchScope}
+                      onChange={(event) => {
+                        const nextScope = event.target.value as
+                          | "netherlands"
+                          | "worldwide_remote";
+                        setSearchScope(nextScope);
+                        if (nextScope === "worldwide_remote") setSource("remotive");
+                      }}
+                    >
+                      <option value="netherlands">All Netherlands</option>
+                      <option value="worldwide_remote">Worldwide remote (NL/EU eligible)</option>
+                    </select>
+                  </div>
                   <div className="sm:col-span-2">
                     <Label htmlFor="query">Role or skills</Label>
                     <Input id="query" className="mt-2 min-h-11" value={query}

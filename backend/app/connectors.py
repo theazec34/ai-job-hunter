@@ -10,6 +10,44 @@ from app.config import Settings
 from app.schemas import JobSource
 
 MAX_DESCRIPTION_CHARACTERS = 20_000
+NETHERLANDS_LOCATION_MARKERS = {
+    "almere",
+    "amersfoort",
+    "amsterdam",
+    "arnhem",
+    "breda",
+    "delft",
+    "den bosch",
+    "den haag",
+    "deventer",
+    "eindhoven",
+    "enschede",
+    "groningen",
+    "haarlem",
+    "hilversum",
+    "hoofddorp",
+    "leeuwarden",
+    "leiden",
+    "maastricht",
+    "middelburg",
+    "netherlands",
+    "nederland",
+    "nijmegen",
+    "rotterdam",
+    "schiedam",
+    "the hague",
+    "tilburg",
+    "utrecht",
+    "venlo",
+    "zwolle",
+}
+WORLDWIDE_MARKERS = {"anywhere", "global", "worldwide", "world-wide"}
+EU_MARKERS = {
+    "europe",
+    "european union",
+    "eu only",
+    "emea",
+}
 
 
 class ConnectorDisabledError(Exception):
@@ -49,6 +87,44 @@ def html_to_text(value: str) -> str:
     return " ".join("".join(parser.parts).split())[:MAX_DESCRIPTION_CHARACTERS]
 
 
+def normalized_location(value: str) -> str:
+    return " ".join(value.lower().replace(",", " ").replace("/", " ").split())
+
+
+def is_netherlands_location(value: str) -> bool:
+    location = normalized_location(value)
+    return any(marker in location for marker in NETHERLANDS_LOCATION_MARKERS)
+
+
+def remote_scope_for_location(value: str) -> str:
+    location = normalized_location(value)
+    if is_netherlands_location(location):
+        return "netherlands"
+    if any(marker in location for marker in WORLDWIDE_MARKERS):
+        return "worldwide"
+    if any(marker in location for marker in EU_MARKERS):
+        return "eu"
+    return "unknown"
+
+
+def location_matches_scope(value: str, scope: str, *, remote: bool) -> bool:
+    remote_scope = remote_scope_for_location(value)
+    if scope == "netherlands":
+        return is_netherlands_location(value)
+    return remote and remote_scope in {"netherlands", "eu", "worldwide"}
+
+
+def country_for_location(value: str) -> str:
+    scope = remote_scope_for_location(value)
+    if scope == "netherlands":
+        return "NL"
+    if scope == "eu":
+        return "EU"
+    if scope == "worldwide":
+        return "Worldwide"
+    return "Unknown"
+
+
 class NormalizedJob(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -64,6 +140,9 @@ class NormalizedJob(BaseModel):
     salary_max: float | None = Field(default=None, ge=0, le=10_000_000)
     salary_currency: str | None = Field(default=None, pattern="^[A-Za-z]{3}$")
     workplace_mode: str | None = Field(default=None, pattern="^(onsite|hybrid|remote)$")
+    remote_scope: str | None = Field(
+        default=None, pattern="^(netherlands|eu|worldwide|unknown)$"
+    )
 
     @field_validator("url")
     @classmethod
@@ -96,7 +175,7 @@ class JobConnector(Protocol):
     attribution: str | None
 
     async def fetch(
-        self, *, query: str, country: str, page: int, limit: int
+        self, *, query: str, country: str, scope: str, page: int, limit: int
     ) -> list[NormalizedJob]: ...
 
 
@@ -133,8 +212,9 @@ class ArbeitnowConnector(BaseConnector):
     source = JobSource.ARBEITNOW
 
     async def fetch(
-        self, *, query: str, country: str, page: int, limit: int
+        self, *, query: str, country: str, scope: str, page: int, limit: int
     ) -> list[NormalizedJob]:
+        del country
         payload = await self._get(
             "https://www.arbeitnow.com/api/job-board-api", params={"page": page}
         )
@@ -146,18 +226,23 @@ class ArbeitnowConnector(BaseConnector):
             haystack = f"{row.get('title', '')} {row.get('description', '')}".lower()
             if query and query.lower() not in haystack:
                 continue
+            location = str(row.get("location", ""))
+            remote = row.get("remote") is True
+            if not location_matches_scope(location, scope, remote=remote):
+                continue
             try:
                 results.append(
                     NormalizedJob(
                         external_id=str(row.get("slug") or row.get("url", "")),
                         title=str(row.get("title", "")),
                         company=str(row.get("company_name", "")),
-                        country=country,
-                        location=str(row.get("location", "")),
+                        country=country_for_location(location),
+                        location=location,
                         description=html_to_text(str(row.get("description", ""))),
                         url=str(row.get("url", "")),
                         employment_type=", ".join(row.get("job_types") or []),
-                        workplace_mode="remote" if row.get("remote") is True else None,
+                        workplace_mode="remote" if remote else None,
+                        remote_scope=remote_scope_for_location(location) if remote else None,
                     )
                 )
             except (ValueError, TypeError):
@@ -172,9 +257,9 @@ class RemotiveConnector(BaseConnector):
     attribution = "Jobs provided by Remotive (https://remotive.com/remote-jobs)."
 
     async def fetch(
-        self, *, query: str, country: str, page: int, limit: int
+        self, *, query: str, country: str, scope: str, page: int, limit: int
     ) -> list[NormalizedJob]:
-        del page
+        del country, page
         payload = await self._get(
             "https://remotive.com/api/remote-jobs", params={"search": query, "limit": limit}
         )
@@ -183,18 +268,22 @@ class RemotiveConnector(BaseConnector):
         for row in rows[:limit]:
             if not isinstance(row, dict):
                 continue
+            location = str(row.get("candidate_required_location", "Remote"))
+            if not location_matches_scope(location, scope, remote=True):
+                continue
             try:
                 results.append(
                     NormalizedJob(
                         external_id=str(row.get("id", "")),
                         title=str(row.get("title", "")),
                         company=str(row.get("company_name", "")),
-                        country=country,
-                        location=str(row.get("candidate_required_location", "Remote")),
+                        country=country_for_location(location),
+                        location=location,
                         description=html_to_text(str(row.get("description", ""))),
                         url=str(row.get("url", "")),
                         employment_type=str(row.get("job_type", "")),
                         workplace_mode="remote",
+                        remote_scope=remote_scope_for_location(location),
                     )
                 )
             except (ValueError, TypeError):
@@ -211,8 +300,10 @@ class AdzunaNLConnector(BaseConnector):
         self.app_key = app_key
 
     async def fetch(
-        self, *, query: str, country: str, page: int, limit: int
+        self, *, query: str, country: str, scope: str, page: int, limit: int
     ) -> list[NormalizedJob]:
+        if scope == "worldwide_remote":
+            return []
         payload = await self._get(
             f"https://api.adzuna.com/v1/api/jobs/nl/search/{page}",
             params={
@@ -246,6 +337,7 @@ class AdzunaNLConnector(BaseConnector):
                             or row.get("salary_max") is not None
                             else None
                         ),
+                        remote_scope=None,
                     )
                 )
             except (ValueError, TypeError, AttributeError):
@@ -259,8 +351,10 @@ class EuresConnector(BaseConnector):
     source = JobSource.EURES
 
     async def fetch(
-        self, *, query: str, country: str, page: int, limit: int
+        self, *, query: str, country: str, scope: str, page: int, limit: int
     ) -> list[NormalizedJob]:
+        if scope == "worldwide_remote":
+            return []
         request_body = {
             "resultsPerPage": limit,
             "page": page,

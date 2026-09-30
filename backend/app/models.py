@@ -76,6 +76,7 @@ class Job(Base):
     salary_max: Mapped[float | None] = mapped_column(Float, nullable=True)
     salary_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     workplace_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    remote_scope: Mapped[str | None] = mapped_column(String(20), nullable=True)
     legitimacy_status: Mapped[str] = mapped_column(String(30), default="needs_review", index=True)
     legitimacy_reasons: Mapped[list[str]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
