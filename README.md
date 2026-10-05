@@ -135,7 +135,7 @@ The default OpenAI-compatible configuration is:
 
 ```env
 LLM_BASE_URL=https://llm.4geeks.ai
-LLM_MODEL=litellm/madrid-spain/openrouter/openai/gpt-6-luna
+LLM_MODEL=madrid-spain/opnerouter/openai/gpt-6-luna
 LLM_TIMEOUT_SECONDS=60
 ```
 

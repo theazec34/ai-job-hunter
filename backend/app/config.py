@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3100"
     llm_api_key: str | None = None
     llm_base_url: str = "https://llm.4geeks.ai"
-    llm_model: str = "litellm/madrid-spain/openrouter/openai/gpt-6-luna"
+    llm_model: str = "madrid-spain/opnerouter/openai/gpt-6-luna"
     llm_timeout_seconds: float = Field(default=60.0, ge=1.0, le=60.0)
     enable_eures_connector: bool = False
     enable_deterministic_demo_matching: bool = False
