@@ -10,6 +10,25 @@ from app.schemas import LLMMatchBatch, ResumeAnalysis
 OutputT = TypeVar("OutputT", bound=BaseModel)
 
 
+def strict_json_schema(model: type[BaseModel]) -> dict[str, object]:
+    output_schema = model.model_json_schema()
+
+    def require_all_properties(node: object) -> None:
+        if isinstance(node, dict):
+            node.pop("default", None)
+            properties = node.get("properties")
+            if isinstance(properties, dict):
+                node["required"] = list(properties)
+            for value in node.values():
+                require_all_properties(value)
+        elif isinstance(node, list):
+            for value in node:
+                require_all_properties(value)
+
+    require_all_properties(output_schema)
+    return output_schema
+
+
 class LLMUnavailableError(Exception):
     pass
 
@@ -45,7 +64,7 @@ class OpenAICompatibleProvider:
                 "json_schema": {
                     "name": schema.__name__,
                     "strict": True,
-                    "schema": schema.model_json_schema(),
+                    "schema": strict_json_schema(schema),
                 },
             },
             "messages": [

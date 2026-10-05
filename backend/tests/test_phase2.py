@@ -190,6 +190,8 @@ async def test_llm_prompt_treats_injection_as_data_and_validates_strict_output()
     output_schema = response_format["json_schema"]["schema"]
     assert output_schema["additionalProperties"] is False
     assert set(output_schema["properties"]) == set(ResumeAnalysis.model_fields)
+    assert set(output_schema["required"]) == set(ResumeAnalysis.model_fields)
+    assert "default" not in output_schema["properties"]["experience_level"]
 
 
 @pytest.mark.anyio
