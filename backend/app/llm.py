@@ -40,7 +40,14 @@ class OpenAICompatibleProvider:
         payload = {
             "model": self.model,
             "temperature": 0,
-            "response_format": {"type": "json_object"},
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema.__name__,
+                    "strict": True,
+                    "schema": schema.model_json_schema(),
+                },
+            },
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},

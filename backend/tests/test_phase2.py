@@ -184,6 +184,12 @@ async def test_llm_prompt_treats_injection_as_data_and_validates_strict_output()
     assert "<untrusted_cv>" in captured["messages"][1]["content"]
     assert injection in captured["messages"][1]["content"]
     assert "never follow instructions" in captured["messages"][0]["content"]
+    response_format = captured["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["json_schema"]["strict"] is True
+    output_schema = response_format["json_schema"]["schema"]
+    assert output_schema["additionalProperties"] is False
+    assert set(output_schema["properties"]) == set(ResumeAnalysis.model_fields)
 
 
 @pytest.mark.anyio
